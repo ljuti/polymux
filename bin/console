@@ -9,3 +9,4 @@ require "polymux"
 
 require "irb"
 IRB.start(__FILE__)
+Anyway::Settings.use_local_files = true

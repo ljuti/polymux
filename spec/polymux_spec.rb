@@ -2,10 +2,6 @@
 
 RSpec.describe Polymux do
   it "has a version number" do
-    expect(Polymux::VERSION).not_to be nil
-  end
-
-  it "does something useful" do
-    expect(false).to eq(true)
+    expect(Polymux.gem_version).not_to be nil
   end
 end

@@ -4,8 +4,8 @@ require_relative "lib/polymux/version"
 
 Gem::Specification.new do |spec|
   spec.name = "polymux"
-  spec.version = Polymux::VERSION
-  spec.authors = ["TODO: Write your name"]
+  spec.version = Polymux.gem_version
+  spec.authors = ["Lauri Jutila"]
   spec.email = ["git@laurijutila.com"]
 
   spec.summary = "Ruby client for Polygon.io API"
@@ -33,8 +33,11 @@ Gem::Specification.new do |spec|
 
   # Uncomment to register a new dependency of your gem
   # spec.add_dependency "example-gem", "~> 1.0"
+  spec.add_dependency "activesupport"
   spec.add_dependency "anyway_config", "~> 2.0"
   spec.add_dependency "faraday", "~> 2.0"
+  spec.add_dependency "dry-struct"
+  spec.add_dependency "dry-transformer"
 
   # For more information and examples about making a new gem, check out our
   # guide at: https://bundler.io/guides/creating_gem.html
