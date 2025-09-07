@@ -30,12 +30,12 @@ module Polymux
         attribute :ticker, Types::String
 
         # Current price of the underlying asset
-        # @return [Float, nil] Current stock price
-        attribute? :price, Types::Float | Types::Nil
+        # @return [Integer, Float, nil] Current stock price
+        attribute? :price, Types::PolymuxNumber | Types::Nil
 
         # Current value (may be same as price or calculated differently)
-        # @return [Float, nil] Asset value
-        attribute? :value, Types::Float | Types::Nil
+        # @return [Integer, Float, nil] Asset value
+        attribute? :value, Types::PolymuxNumber | Types::Nil
 
         # Timestamp when underlying data was last updated (nanoseconds)
         # @return [Integer, nil] Unix timestamp with nanosecond precision
@@ -46,8 +46,8 @@ module Polymux
         attribute? :timeframe, Types::String | Types::Nil
 
         # Dollar amount underlying needs to move to reach option break-even
-        # @return [Float, Integer] Positive = needs to go up, negative = needs to go down
-        attribute :change_to_break_even, Types::Float | Types::Integer
+        # @return [Integer, Float] Positive = needs to go up, negative = needs to go down
+        attribute :change_to_break_even, Types::PolymuxNumber
 
         # Convert nanosecond timestamp to DateTime object.
         # @return [DateTime, nil] Converted timestamp for easy manipulation

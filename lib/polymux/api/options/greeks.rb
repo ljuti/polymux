@@ -26,24 +26,24 @@ module Polymux
         transform_keys(&:to_sym)
 
         # Delta: sensitivity to underlying price changes
-        # @return [Float, nil] Change in option price per $1 change in underlying
+        # @return [Integer, Float, nil] Change in option price per $1 change in underlying
         #   Ranges from 0 to 1 for calls, 0 to -1 for puts
-        attribute? :delta, Types::Float | Types::Nil
+        attribute? :delta, Types::PolymuxNumber | Types::Nil
 
         # Gamma: sensitivity of delta to underlying price changes
-        # @return [Float, nil] Change in delta per $1 change in underlying
+        # @return [Integer, Float, nil] Change in delta per $1 change in underlying
         #   Higher gamma means delta changes more rapidly
-        attribute? :gamma, Types::Float | Types::Nil
+        attribute? :gamma, Types::PolymuxNumber | Types::Nil
 
         # Theta: time decay sensitivity
-        # @return [Float, nil] Change in option price per day passing
+        # @return [Integer, Float, nil] Change in option price per day passing
         #   Usually negative (options lose value as expiration approaches)
-        attribute? :theta, Types::Float | Types::Nil
+        attribute? :theta, Types::PolymuxNumber | Types::Nil
 
         # Vega: sensitivity to volatility changes
-        # @return [Float, nil] Change in option price per 1% change in implied volatility
+        # @return [Integer, Float, nil] Change in option price per 1% change in implied volatility
         #   Higher vega means more sensitive to volatility changes
-        attribute? :vega, Types::Float | Types::Nil
+        attribute? :vega, Types::PolymuxNumber | Types::Nil
 
         # Check if this option has high gamma (>0.05).
         # High gamma indicates rapid changes in delta.

@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "conditions": [200],
+      "price": 3.25,
+      "sip_timestamp": 1678901234000000000,
+      "size": 5,
+      "timeframe": "REALTIME"
+    },
+    {
+      "conditions": [200],
+      "price": 3.20,
+      "sip_timestamp": 1678901230000000000,
+      "size": 10,
+      "timeframe": "REALTIME"
+    }
+  ],
+  "status": "OK",
+  "request_id": "test_request_id_trades"
+}

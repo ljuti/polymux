@@ -1,0 +1,24 @@
+{
+  "results": [
+    {
+      "ask_price": 3.30,
+      "ask_size": 25,
+      "bid_price": 3.20,
+      "bid_size": 30,
+      "sip_timestamp": 1678901234000000000,
+      "sequence_number": 12345,
+      "timeframe": "REALTIME"
+    },
+    {
+      "ask_price": 3.35,
+      "ask_size": 20,
+      "bid_price": 3.25,
+      "bid_size": 35,
+      "sip_timestamp": 1678901230000000000,
+      "sequence_number": 12340,
+      "timeframe": "REALTIME"
+    }
+  ],
+  "status": "OK",
+  "request_id": "test_request_id_quotes"
+}

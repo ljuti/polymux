@@ -1,0 +1,16 @@
+{
+  "results": [
+    {
+      "T": "O:AAPL240315C00150000",
+      "c": 3.10,
+      "h": 3.25,
+      "l": 2.95,
+      "o": 3.05,
+      "t": 1678815600000,
+      "v": 12450,
+      "vw": 3.08
+    }
+  ],
+  "status": "OK",
+  "request_id": "test_request_id_previous_day"
+}

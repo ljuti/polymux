@@ -57,7 +57,7 @@ module Polymux
     #   ws = client.websocket
     #   ws.options.start  # Connect to options WebSocket feed
     def websocket
-      Websocket.new(@_config)
+      Polymux::Websocket.new(@_config)
     end
 
     # Access the Exchanges API for exchange information.

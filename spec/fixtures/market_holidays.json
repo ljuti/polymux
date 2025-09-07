@@ -1,0 +1,21 @@
+[
+  {
+    "exchange": "XNYS",
+    "name": "Independence Day",
+    "date": "2024-07-04",
+    "status": "closed"
+  },
+  {
+    "exchange": "XNYS",
+    "name": "Thanksgiving Day",
+    "date": "2024-11-28",
+    "status": "closed"
+  },
+  {
+    "exchange": "XNYS", 
+    "name": "Day after Thanksgiving",
+    "date": "2024-11-29",
+    "status": "early-close",
+    "close": "13:00"
+  }
+]

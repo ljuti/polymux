@@ -1,0 +1,96 @@
+{
+  "results": [
+    {
+      "break_even_price": 152.45,
+      "day": {
+        "change": 2.15,
+        "change_percent": 1.45,
+        "close": 3.25,
+        "high": 3.30,
+        "last_updated": 1678901234000000000,
+        "low": 2.85,
+        "open": 2.90,
+        "previous_close": 3.10,
+        "volume": 15430,
+        "vwap": 3.12
+      },
+      "implied_volatility": 0.28,
+      "last_quote": {
+        "ask_price": 3.30,
+        "ask_size": 25,
+        "bid_price": 3.20,
+        "bid_size": 30,
+        "last_updated": 1678901234000000000
+      },
+      "last_trade": {
+        "conditions": [200],
+        "price": 3.25,
+        "sip_timestamp": 1678901234000000000,
+        "size": 5,
+        "timeframe": "REALTIME"
+      },
+      "open_interest": 1542,
+      "underlying_asset": {
+        "change_to_break_even": -2.45,
+        "last_updated": 1678901234000000000,
+        "price": 150.00,
+        "ticker": "AAPL",
+        "timeframe": "REALTIME",
+        "value": 15000000
+      },
+      "greeks": {
+        "delta": 0.65,
+        "gamma": 0.025,
+        "theta": -0.05,
+        "vega": 0.15
+      }
+    },
+    {
+      "break_even_price": 148.75,
+      "day": {
+        "change": -0.85,
+        "change_percent": -1.25,
+        "close": 6.15,
+        "high": 6.45,
+        "last_updated": 1678901234000000000,
+        "low": 5.95,
+        "open": 6.30,
+        "previous_close": 7.00,
+        "volume": 8920,
+        "vwap": 6.22
+      },
+      "implied_volatility": 0.32,
+      "last_quote": {
+        "ask_price": 6.25,
+        "ask_size": 15,
+        "bid_price": 6.10,
+        "bid_size": 20,
+        "last_updated": 1678901234000000000
+      },
+      "last_trade": {
+        "conditions": [200],
+        "price": 6.15,
+        "sip_timestamp": 1678901234000000000,
+        "size": 3,
+        "timeframe": "REALTIME"
+      },
+      "open_interest": 945,
+      "underlying_asset": {
+        "change_to_break_even": 1.25,
+        "last_updated": 1678901234000000000,
+        "price": 150.00,
+        "ticker": "AAPL",
+        "timeframe": "REALTIME",
+        "value": 15000000
+      },
+      "greeks": {
+        "delta": -0.45,
+        "gamma": 0.018,
+        "theta": -0.03,
+        "vega": 0.12
+      }
+    }
+  ],
+  "status": "OK",
+  "request_id": "test_request_id_chain"
+}

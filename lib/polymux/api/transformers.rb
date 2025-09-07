@@ -90,6 +90,7 @@ module Polymux
       #   - :status instead of :market
       #   - :indices instead of :indiceGroups
       def self.market_status(json)
+        return {} unless json.is_a?(Hash)
         input = self[:symbolize_keys].call(json)
         self[:rename_keys].call(input, afterHours: :after_hours, earlyHours: :pre_market, market: :status, indiceGroups: :indices)
       end
@@ -124,10 +125,11 @@ module Polymux
       #   - :daily_bar instead of :day
       #   - Empty :last_quote, :last_trade, and :daily_bar objects removed
       def self.snapshot(json)
-        input = self[:rename_keys].call(json, day: :daily_bar)
-        input.delete(:last_quote) if input[:last_quote].empty?
-        input.delete(:last_trade) if input[:last_trade].empty?
-        input.delete(:daily_bar) if input[:daily_bar].empty?
+        input = self[:symbolize_keys].call(json)
+        input = self[:rename_keys].call(input, day: :daily_bar)
+        input.delete(:last_quote) if input[:last_quote] && input[:last_quote].empty?
+        input.delete(:last_trade) if input[:last_trade] && input[:last_trade].empty?
+        input.delete(:daily_bar) if input[:daily_bar] && input[:daily_bar].empty?
         input
       end
     end

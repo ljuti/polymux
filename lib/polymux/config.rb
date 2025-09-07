@@ -55,6 +55,11 @@ module Polymux
     # customized for testing or if using a different API endpoint.
     #
     # @return [String] The base URL (default: "https://api.polygon.io")
-    attr_config :base_url, default: "https://api.polygon.io"
+    attr_config :base_url
+
+    def initialize(**)
+      super
+      self.base_url ||= "https://api.polygon.io"
+    end
   end
 end

@@ -1,0 +1,36 @@
+{
+  "results": [
+    {
+      "asset_class": "stocks",
+      "id": 1,
+      "mic": "XNYS",
+      "name": "New York Stock Exchange",
+      "operating_mic": "XNYS",
+      "participant_id": "N",
+      "type": "exchange",
+      "url": "https://www.nyse.com"
+    },
+    {
+      "asset_class": "options",
+      "id": 2,
+      "mic": "XCBO",
+      "name": "Chicago Board Options Exchange",
+      "operating_mic": "XCBO",
+      "participant_id": "C",
+      "type": "exchange",
+      "url": "https://www.cboe.com"
+    },
+    {
+      "asset_class": "stocks",
+      "id": 3,
+      "mic": "XNGS",
+      "name": "NASDAQ Global Select Market",
+      "operating_mic": "XNGS",
+      "participant_id": "Q",
+      "type": "exchange",
+      "url": "https://www.nasdaq.com"
+    }
+  ],
+  "status": "OK",
+  "request_id": "test_request_id_exchanges"
+}

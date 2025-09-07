@@ -1,0 +1,15 @@
+{
+  "results": {
+    "close": 3.25,
+    "high": 3.45,
+    "low": 2.85,
+    "open": 3.10,
+    "status": "OK",
+    "symbol": "O:AAPL240315C00150000",
+    "volume": 15430,
+    "afterHours": 3.28,
+    "preMarket": 3.12
+  },
+  "status": "OK",
+  "request_id": "test_request_id_daily_summary"
+}

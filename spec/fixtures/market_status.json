@@ -1,0 +1,17 @@
+{
+  "market": "open",
+  "serverTime": "2024-03-15T14:30:00.000Z",
+  "exchanges": {
+    "nasdaq": "open",
+    "nyse": "open"
+  },
+  "currencies": {
+    "fx": "open"
+  },
+  "indiceGroups": {
+    "s_and_p": "open",
+    "nasdaq": "open"
+  },
+  "afterHours": false,
+  "earlyHours": false
+}

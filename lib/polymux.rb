@@ -5,6 +5,7 @@ require "polymux/client"
 require "polymux/types"
 require "polymux/version"
 require "polymux/api"
+require "polymux/websocket"
 
 # Polymux is a Ruby client library for the Polygon.io API, providing access to
 # financial market data including stocks, options, forex, and cryptocurrencies.

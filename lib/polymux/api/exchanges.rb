@@ -104,7 +104,8 @@ module Polymux
       #   end
       def list
         request = _client.http.get("/v3/reference/exchanges")
-        Types::Array.of(Exchange).try(request.body.fetch("results", []))
+        results = request.body.fetch("results", [])
+        results.map { |exchange_data| Exchange.new(exchange_data) }
       end
     end
   end

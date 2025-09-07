@@ -76,6 +76,7 @@ module Polymux
         options = options.dup
         options[:underlying_ticker] = ticker if ticker.is_a?(String)
         request = _client.http.get("/v3/reference/options/contracts", options)
+        return [] unless request.body.is_a?(Hash)
         request.body.fetch("results", []).map do |contract_json|
           Contract.from_api(contract_json)
         end
@@ -275,7 +276,7 @@ module Polymux
 
         _client.http.get("/v1/open-close/#{ticker}/#{date}").tap do |response|
           raise Polymux::Api::Error, "Failed to fetch daily summary for #{ticker} on #{date}" unless response.success?
-          return DailySummary.try(response.body.fetch("results", {}))
+          return DailySummary.new(response.body.fetch("results", {}))
         end
       end
 
