@@ -6,6 +6,10 @@ module Polymux
       @_config = config
     end
 
+    def websocket
+      Websocket.new(@_config)
+    end
+
     def exchanges
       Api::Exchanges.new(self)
     end
