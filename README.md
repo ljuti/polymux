@@ -5,13 +5,14 @@ A comprehensive Ruby client library for the Polygon.io API, providing access to 
 ## Features
 
 - **Production-Ready Options Trading**: Complete options contracts, snapshots, chains, trades, quotes, and market data with comprehensive analysis tools
+- **Complete Stock Market Data**: Real-time quotes, historical trades, OHLC aggregates, market snapshots, and ticker discovery with advanced filtering
 - **Market Information**: Real-time market status, holidays, and trading schedules  
 - **Exchange Data**: Comprehensive exchange listings with asset class filtering
 - **WebSocket Streaming**: Real-time and delayed data feeds for options and stocks
 - **Type Safety**: Immutable data structures using dry-struct for reliable data handling
 - **Flexible Configuration**: Environment variables, YAML files, or direct configuration
-- **100% Test Coverage**: Comprehensive test suite with 268 tests covering all functionality
-- **Complete Documentation**: All classes and methods fully documented with YARD
+- **Comprehensive BDD Testing**: **331 tests** including behavioral specs focused on user investment workflows
+- **Complete Documentation**: All classes and methods fully documented with YARD and real-world examples
 
 ## Installation
 
@@ -76,6 +77,65 @@ client = Polymux::Client.new
 client = Polymux::Client.new(
   Polymux::Config.new(api_key: "your_api_key")
 )
+```
+
+### Stock Market Data
+
+```ruby
+stocks = client.stocks
+
+# Stock Discovery & Universe Building
+active_tickers = stocks.tickers(active: true, market: "stocks", limit: 1000)
+puts "Found #{active_tickers.length} active stocks for screening"
+
+# Screen for large-cap technology stocks
+large_cap_tech = active_tickers.select do |ticker|
+  details = stocks.ticker_details(ticker.ticker)
+  details.market_cap && details.market_cap > 10_000_000_000 &&
+  details.sic_description&.include?("Computer")
+end
+puts "Large-cap tech stocks: #{large_cap_tech.length}"
+
+# Real-time Market Data
+snapshot = stocks.snapshot("AAPL")
+puts "#{snapshot.ticker}: $#{snapshot.last_trade.price}"
+puts "Daily change: #{snapshot.daily_bar.change_percent.round(2)}%"
+puts "Volume: #{snapshot.daily_bar.volume.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse}"
+
+# Portfolio Performance Monitoring  
+portfolio = ["AAPL", "MSFT", "GOOGL", "TSLA"]
+portfolio_snapshots = portfolio.map { |ticker| stocks.snapshot(ticker) }
+
+puts "\nPortfolio Performance:"
+portfolio_snapshots.each do |snap|
+  change_pct = snap.daily_bar.change_percent
+  indicator = change_pct >= 0 ? "📈" : "📉"
+  puts "#{indicator} #{snap.ticker}: $#{snap.last_trade.price} (#{change_pct.round(2)}%)"
+end
+
+# Historical Analysis & Backtesting
+historical_data = stocks.aggregates("AAPL", 1, "day", "2024-01-01", "2024-12-31")
+puts "\nAAPL 2024 Analysis:"
+puts "Total trading days: #{historical_data.length}"
+
+# Calculate key metrics
+prices = historical_data.map(&:close)
+returns = prices.each_cons(2).map { |prev, curr| (curr - prev) / prev }
+avg_return = returns.sum / returns.length
+volatility = Math.sqrt(returns.map { |r| (r - avg_return) ** 2 }.sum / returns.length)
+
+puts "Average daily return: #{(avg_return * 100).round(4)}%"  
+puts "Daily volatility: #{(volatility * 100).round(4)}%"
+puts "Annualized volatility: #{(volatility * Math.sqrt(252) * 100).round(2)}%"
+
+# Technical Analysis
+recent_bars = historical_data.last(20)
+sma_20 = recent_bars.map(&:close).sum / recent_bars.length
+current_price = recent_bars.last.close
+
+puts "Current price: $#{current_price}"
+puts "20-day SMA: $#{sma_20.round(2)}"
+puts "Price vs SMA: #{current_price > sma_20 ? 'Above' : 'Below'} trend"
 ```
 
 ### Options Trading Data
@@ -252,7 +312,7 @@ After checking out the repo, run `bin/setup` to install dependencies. Then, run 
 
 ### Testing
 
-The library includes a comprehensive test suite with 268 tests covering all functionality:
+The library includes a comprehensive test suite with **331 tests** covering all functionality, including behavioral specs focused on user investment workflows:
 
 ```bash
 # Run all tests
@@ -262,6 +322,8 @@ bundle exec rspec
 bundle exec rspec --format documentation
 
 # Run specific test files
+bundle exec rspec spec/polymux/api/stocks_spec.rb
+bundle exec rspec spec/behavior/stocks_behavior_spec.rb
 bundle exec rspec spec/polymux/api/options_spec.rb
 ```
 
@@ -275,10 +337,12 @@ yard doc
 
 ## Current Status
 
-✅ **Production Ready**: Complete options trading functionality with comprehensive error handling  
-✅ **Fully Tested**: 268 tests covering all components, API endpoints, and edge cases  
-✅ **Completely Documented**: All classes and methods documented with examples  
-✅ **Type Safe**: Immutable data structures prevent runtime errors  
+✅ **Production Ready**: Complete options trading and stock market data functionality with comprehensive error handling  
+✅ **Complete Stock Market Data**: Real-time quotes, historical OHLC data, market snapshots, ticker discovery, and portfolio analysis tools  
+✅ **Fully Tested**: **331 tests** covering all components, API endpoints, edge cases, and user behavioral workflows  
+✅ **BDD Testing Approach**: Behavioral specs focused on real user investment research and analysis scenarios  
+✅ **Completely Documented**: All classes and methods documented with practical examples and usage patterns  
+✅ **Type Safe**: Immutable data structures prevent runtime errors and ensure data integrity  
 ✅ **Flexible Configuration**: Multiple configuration options for different environments
 
 To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).

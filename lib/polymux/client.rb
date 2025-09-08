@@ -108,6 +108,39 @@ module Polymux
       Api::Stocks.new(self)
     end
 
+    # Access technical indicators for quantitative analysis.
+    #
+    # Provides access to professional-grade technical indicators that eliminate
+    # the need for external calculation libraries. Polygon.io's indicators are
+    # significantly faster than fetching raw data and calculating locally.
+    #
+    # @return [Api::TechnicalIndicators] Technical indicators API handler
+    #
+    # @example Moving averages for trend analysis
+    #   indicators = client.technical_indicators
+    #
+    #   sma_20 = indicators.sma("AAPL", window: 20, timespan: "day")
+    #   ema_12 = indicators.ema("AAPL", window: 12, timespan: "day")
+    #
+    #   if sma_20.trending_up? && ema_12.current_value > sma_20.current_value
+    #     puts "Strong uptrend with momentum"
+    #   end
+    #
+    # @example Momentum oscillators for timing
+    #   indicators = client.technical_indicators
+    #
+    #   rsi = indicators.rsi("AAPL", window: 14, timespan: "day")
+    #   macd = indicators.macd("AAPL",
+    #     short_window: 12, long_window: 26, signal_window: 9, timespan: "day"
+    #   )
+    #
+    #   if rsi.oversold? && macd.bullish_crossover?
+    #     puts "Potential buy signal - oversold with momentum confirmation"
+    #   end
+    def technical_indicators
+      Api::TechnicalIndicators.new(self)
+    end
+
     # Get the configured HTTP client for making API requests.
     #
     # The HTTP client is configured with JSON request/response handling,
@@ -149,3 +182,6 @@ module Polymux
     end
   end
 end
+
+# Require API modules after Client class is fully defined
+require_relative "api/technical_indicators"
