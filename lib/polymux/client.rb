@@ -96,6 +96,18 @@ module Polymux
       Api::Options.new(self)
     end
 
+    # Access the Stocks API for stock market data.
+    #
+    # @return [Polymux::Api::Stocks] Stocks API handler
+    #
+    # @example
+    #   tickers = client.stocks.tickers(active: true)
+    #   snapshot = client.stocks.snapshot("AAPL")
+    #   aggregates = client.stocks.aggregates("AAPL", 1, "day", "2024-01-01", "2024-06-30")
+    def stocks
+      Api::Stocks.new(self)
+    end
+
     # Get the configured HTTP client for making API requests.
     #
     # The HTTP client is configured with JSON request/response handling,

@@ -1,0 +1,10 @@
+{
+  "status": "OK",
+  "from": "2024-08-15",
+  "symbol": "AAPL",
+  "open": 173.01,
+  "close": 174.49,
+  "afterHours": 174.65,
+  "preMarket": 172.85,
+  "adjusted": true
+}

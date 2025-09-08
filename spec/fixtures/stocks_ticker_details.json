@@ -1,0 +1,34 @@
+{
+  "results": {
+    "ticker": "AAPL",
+    "name": "Apple Inc.",
+    "market": "stocks",
+    "locale": "us",
+    "primary_exchange": "XNAS",
+    "type": "CS",
+    "active": true,
+    "currency_name": "USD",
+    "cik": "0000320193",
+    "composite_figi": "BBG000B9XRY4",
+    "share_class_figi": "BBG001S5N8V8",
+    "description": "Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide.",
+    "homepage_url": "https://www.apple.com",
+    "total_employees": 161000,
+    "list_date": "1980-12-12",
+    "icon_url": "https://api.polygon.io/v1/reference/company-branding/YXBwbGUuY29t/images/2022-01-10_icon.png",
+    "share_class_shares_outstanding": 15550061000,
+    "weighted_shares_outstanding": 15550061000,
+    "market_cap": 2800000000000,
+    "phone_number": "+1 408 996-1010",
+    "address": {
+      "address1": "One Apple Park Way",
+      "city": "Cupertino",
+      "state": "CA",
+      "postal_code": "95014"
+    },
+    "sic_code": "3571",
+    "sic_description": "Electronic Computers"
+  },
+  "status": "OK",
+  "request_id": "test-request-124"
+}
