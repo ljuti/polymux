@@ -97,7 +97,9 @@ RSpec.describe Polymux::Config, :skip_config_setup do
   describe "validation behavior" do
     context "when api_key is missing" do
       it "allows initialization without api_key" do
-        expect { described_class.new }.not_to raise_error
+        config_instance = described_class.new
+        expect(config_instance).to be_a(described_class)
+        expect(config_instance.api_key).to be_nil
       end
 
       it "returns nil for api_key" do

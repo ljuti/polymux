@@ -18,7 +18,9 @@ RSpec.describe Polymux::Api::Options::UnderlyingAsset do
 
   describe "initialization" do
     it "accepts underlying asset data hash" do
-      expect { described_class.new(asset_data) }.not_to raise_error
+      asset_instance = described_class.new(asset_data)
+      expect(asset_instance).to be_a(described_class)
+      expect(asset_instance.ticker).to eq("AAPL")
     end
 
     it "transforms keys to symbols" do

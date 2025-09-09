@@ -38,6 +38,10 @@ module Polymux
   # @see Polymux::Api::Markets Market status and holidays
   # @see Polymux::Api::Exchanges Exchange information
   class Client
+    # HTTP configuration constants to make mutations more explicit
+    JSON_CONTENT_TYPE_REGEX = /\bjson$/
+    DEFAULT_HTTP_ADAPTER = Faraday.default_adapter
+
     # Initialize a new Polymux client.
     #
     # @param config [Polymux::Config] Configuration object containing API credentials
@@ -222,12 +226,30 @@ module Polymux
     # @return [Faraday::Connection] Configured HTTP client
     # @api private
     def http
-      @_http ||= Faraday.new(url: @_config.base_url) do |faraday|
-        faraday.request :json
-        faraday.response :json, content_type: /\bjson$/
-        faraday.adapter Faraday.default_adapter
-        faraday.headers["Authorization"] = "Bearer #{@_config.api_key}"
+      @_http ||= build_http_client
+    end
+
+    private
+
+    def build_http_client
+      Faraday.new(url: @_config.base_url) do |faraday|
+        configure_json_handling(faraday)
+        configure_adapter(faraday)  
+        configure_authorization(faraday)
       end
+    end
+
+    def configure_json_handling(faraday)
+      faraday.request :json
+      faraday.response :json, content_type: JSON_CONTENT_TYPE_REGEX
+    end
+
+    def configure_adapter(faraday)
+      faraday.adapter DEFAULT_HTTP_ADAPTER
+    end
+
+    def configure_authorization(faraday)
+      faraday.headers["Authorization"] = "Bearer #{@_config.api_key}"
     end
 
     # Base class for all REST API handlers.

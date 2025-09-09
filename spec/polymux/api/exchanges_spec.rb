@@ -76,7 +76,9 @@ RSpec.describe Polymux::Api::Exchanges do
 
     describe "initialization" do
       it "accepts exchange data hash" do
-        expect { described_class::Exchange.new(exchange_data) }.not_to raise_error
+        exchange_instance = described_class::Exchange.new(exchange_data)
+        expect(exchange_instance).to be_a(described_class::Exchange)
+        expect(exchange_instance.name).to eq("Chicago Board Options Exchange")
       end
 
       it "transforms keys to symbols" do

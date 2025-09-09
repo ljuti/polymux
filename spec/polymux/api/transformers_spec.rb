@@ -307,6 +307,1061 @@ RSpec.describe Polymux::Api::Transformers do
     end
   end
 
+  describe ".ticker" do
+    let(:raw_ticker) do
+      {
+        "ticker" => "AAPL",
+        "name" => "Apple Inc.",
+        "market" => "stocks",
+        "locale" => "us",
+        "primary_exchange" => "XNGS",
+        "type" => "CS",
+        "active" => true,
+        "currency_name" => "usd",
+        "cik" => "0000320193",
+        "composite_figi" => "BBG000B9XRY4",
+        "share_class_figi" => "BBG001S5N8V8",
+        "last_updated_utc" => "2023-01-09T00:00:00Z"
+      }
+    end
+
+    it "converts string keys to symbols" do
+      result = described_class.ticker(raw_ticker)
+
+      expect(result.keys).to all(be_a(Symbol))
+    end
+
+    it "preserves all ticker data" do
+      result = described_class.ticker(raw_ticker)
+
+      expect(result[:ticker]).to eq("AAPL")
+      expect(result[:name]).to eq("Apple Inc.")
+      expect(result[:market]).to eq("stocks")
+      expect(result[:locale]).to eq("us")
+      expect(result[:primary_exchange]).to eq("XNGS")
+      expect(result[:type]).to eq("CS")
+      expect(result[:active]).to eq(true)
+      expect(result[:currency_name]).to eq("usd")
+      expect(result[:cik]).to eq("0000320193")
+      expect(result[:composite_figi]).to eq("BBG000B9XRY4")
+      expect(result[:share_class_figi]).to eq("BBG001S5N8V8")
+      expect(result[:last_updated_utc]).to eq("2023-01-09T00:00:00Z")
+    end
+
+    context "with empty input" do
+      it "handles empty hash" do
+        result = described_class.ticker({})
+
+        expect(result).to eq({})
+      end
+    end
+
+    context "with nil values" do
+      let(:ticker_with_nils) do
+        {
+          "ticker" => "AAPL",
+          "name" => nil,
+          "active" => false
+        }
+      end
+
+      it "preserves nil values" do
+        result = described_class.ticker(ticker_with_nils)
+
+        expect(result[:ticker]).to eq("AAPL")
+        expect(result[:name]).to be_nil
+        expect(result[:active]).to eq(false)
+      end
+    end
+  end
+
+  describe ".ticker_details" do
+    let(:raw_ticker_details) do
+      {
+        "ticker" => "AAPL",
+        "name" => "Apple Inc.",
+        "description" => "Apple Inc. designs, manufactures, and markets smartphones",
+        "homepage_url" => "https://www.apple.com",
+        "total_employees" => 164000,
+        "list_date" => "1980-12-12",
+        "branding" => {
+          "logo_url" => "https://api.polygon.io/v1/reference/company-branding/d3d3LmFwcGxlLmNvbQ/images/2022-01-10_logo.svg",
+          "icon_url" => "https://api.polygon.io/v1/reference/company-branding/d3d3LmFwcGxlLmNvbQ/images/2022-01-10_icon.png"
+        },
+        "address" => {
+          "address1" => "One Apple Park Way",
+          "city" => "Cupertino",
+          "state" => "CA",
+          "postal_code" => "95014"
+        },
+        "phone_number" => "(408) 996-1010",
+        "sic_code" => "3571",
+        "sic_description" => "ELECTRONIC COMPUTERS"
+      }
+    end
+
+    it "converts string keys to symbols" do
+      result = described_class.ticker_details(raw_ticker_details)
+
+      expect(result.keys).to all(be_a(Symbol))
+    end
+
+    it "symbolizes nested address keys" do
+      result = described_class.ticker_details(raw_ticker_details)
+
+      expect(result[:address].keys).to all(be_a(Symbol))
+      expect(result[:address][:address1]).to eq("One Apple Park Way")
+      expect(result[:address][:city]).to eq("Cupertino")
+      expect(result[:address][:state]).to eq("CA")
+      expect(result[:address][:postal_code]).to eq("95014")
+    end
+
+    it "preserves all ticker details data" do
+      result = described_class.ticker_details(raw_ticker_details)
+
+      expect(result[:ticker]).to eq("AAPL")
+      expect(result[:name]).to eq("Apple Inc.")
+      expect(result[:description]).to eq("Apple Inc. designs, manufactures, and markets smartphones")
+      expect(result[:homepage_url]).to eq("https://www.apple.com")
+      expect(result[:total_employees]).to eq(164000)
+      expect(result[:list_date]).to eq("1980-12-12")
+      expect(result[:phone_number]).to eq("(408) 996-1010")
+      expect(result[:sic_code]).to eq("3571")
+      expect(result[:sic_description]).to eq("ELECTRONIC COMPUTERS")
+    end
+
+    it "preserves nested branding with string keys" do
+      result = described_class.ticker_details(raw_ticker_details)
+
+      # The branding field is not automatically symbolized like address
+      expect(result[:branding]["logo_url"]).to include("logo.svg")
+      expect(result[:branding]["icon_url"]).to include("icon.png")
+    end
+
+    context "when address is nil" do
+      let(:ticker_details_no_address) do
+        {
+          "ticker" => "AAPL",
+          "name" => "Apple Inc.",
+          "address" => nil
+        }
+      end
+
+      it "handles nil address gracefully" do
+        result = described_class.ticker_details(ticker_details_no_address)
+
+        expect(result[:address]).to be_nil
+        expect(result[:ticker]).to eq("AAPL")
+      end
+    end
+
+    context "when address is not a hash" do
+      let(:ticker_details_string_address) do
+        {
+          "ticker" => "AAPL",
+          "address" => "One Apple Park Way, Cupertino, CA"
+        }
+      end
+
+      it "preserves non-hash address" do
+        result = described_class.ticker_details(ticker_details_string_address)
+
+        expect(result[:address]).to eq("One Apple Park Way, Cupertino, CA")
+      end
+    end
+
+    context "with empty address" do
+      let(:ticker_details_empty_address) do
+        {
+          "ticker" => "AAPL",
+          "address" => {}
+        }
+      end
+
+      it "handles empty address hash" do
+        result = described_class.ticker_details(ticker_details_empty_address)
+
+        expect(result[:address]).to eq({})
+      end
+    end
+  end
+
+  describe ".stock_trade" do
+    let(:ticker) { "AAPL" }
+    let(:raw_stock_trade) do
+      {
+        "conditions" => [1, 14, 37],
+        "p" => 150.25,
+        "s" => 100,
+        "sip_timestamp" => 1678901234000000000,
+        "x" => 4,
+        "participant_timestamp" => 1678901234000000000,
+        "tape" => "A"
+      }
+    end
+
+    it "adds ticker to the result" do
+      result = described_class.stock_trade(ticker, raw_stock_trade)
+
+      expect(result[:ticker]).to eq("AAPL")
+    end
+
+    it "renames p to price" do
+      result = described_class.stock_trade(ticker, raw_stock_trade)
+
+      expect(result[:price]).to eq(150.25)
+      expect(result).not_to have_key(:p)
+    end
+
+    it "renames s to size" do
+      result = described_class.stock_trade(ticker, raw_stock_trade)
+
+      expect(result[:size]).to eq(100)
+      expect(result).not_to have_key(:s)
+    end
+
+    it "renames x to exchange" do
+      result = described_class.stock_trade(ticker, raw_stock_trade)
+
+      expect(result[:exchange]).to eq(4)
+      expect(result).not_to have_key(:x)
+    end
+
+    it "renames c to conditions when present" do
+      trade_with_c = raw_stock_trade.merge("c" => [200])
+      result = described_class.stock_trade(ticker, trade_with_c)
+
+      expect(result[:conditions]).to eq([200])
+      expect(result).not_to have_key(:c)
+    end
+
+    it "renames sip_timestamp to timestamp (overriding convert_timestamp)" do
+      result = described_class.stock_trade(ticker, raw_stock_trade)
+
+      # Due to rename_keys overriding the converted timestamp, original value is preserved
+      expect(result[:timestamp]).to eq(1678901234000000000)
+      expect(result).not_to have_key(:sip_timestamp)
+    end
+
+    it "preserves other trade data" do
+      result = described_class.stock_trade(ticker, raw_stock_trade)
+
+      expect(result[:conditions]).to eq([1, 14, 37])
+      expect(result[:participant_timestamp]).to eq(1678901234000000000)
+      expect(result[:tape]).to eq("A")
+    end
+
+    context "with t field timestamp" do
+      let(:trade_with_t) do
+        {
+          "p" => 150.25,
+          "s" => 100,
+          "t" => 1678901234000,
+          "x" => 4
+        }
+      end
+
+      it "renames t to timestamp" do
+        result = described_class.stock_trade(ticker, trade_with_t)
+
+        expect(result[:timestamp]).to eq(1678901234000)
+        expect(result).not_to have_key(:t)
+      end
+    end
+
+    context "with participant_timestamp only" do
+      let(:trade_with_participant) do
+        {
+          "p" => 150.25,
+          "s" => 100,
+          "participant_timestamp" => 1678901234000000000,
+          "x" => 4
+        }
+      end
+
+      it "uses participant_timestamp for conversion" do
+        result = described_class.stock_trade(ticker, trade_with_participant)
+
+        expect(result[:timestamp]).to be_a(String)
+        expect(result[:participant_timestamp]).to eq(1678901234000000000)
+      end
+    end
+
+    context "without any timestamp fields" do
+      let(:trade_no_timestamp) do
+        {
+          "p" => 150.25,
+          "s" => 100,
+          "x" => 4
+        }
+      end
+
+      it "handles missing timestamp fields" do
+        result = described_class.stock_trade(ticker, trade_no_timestamp)
+
+        expect(result[:timestamp]).to be_nil
+        expect(result[:ticker]).to eq("AAPL")
+        expect(result[:price]).to eq(150.25)
+      end
+    end
+
+    context "with nil timestamp values" do
+      let(:trade_nil_timestamp) do
+        {
+          "p" => 150.25,
+          "s" => 100,
+          "sip_timestamp" => nil,
+          "t" => nil,
+          "participant_timestamp" => nil
+        }
+      end
+
+      it "handles nil timestamp values" do
+        result = described_class.stock_trade(ticker, trade_nil_timestamp)
+
+        expect(result[:timestamp]).to be_nil
+        expect(result[:participant_timestamp]).to be_nil
+      end
+    end
+  end
+
+  describe ".stock_quote" do
+    let(:ticker) { "AAPL" }
+    let(:raw_stock_quote) do
+      {
+        "P" => 150.20,  # bid_price (capital P)
+        "p" => 150.25,  # ask_price (lowercase p) 
+        "S" => 300,     # bid_size (capital S)
+        "s" => 200,     # ask_size (lowercase s)
+        "x" => 4,       # bid_exchange
+        "X" => 11,      # ask_exchange
+        "sip_timestamp" => 1678901234000000000,
+        "c" => [1],
+        "tape" => "A"
+      }
+    end
+
+    it "adds ticker to the result" do
+      result = described_class.stock_quote(ticker, raw_stock_quote)
+
+      expect(result[:ticker]).to eq("AAPL")
+    end
+
+    it "renames P to bid_price" do
+      result = described_class.stock_quote(ticker, raw_stock_quote)
+
+      expect(result[:bid_price]).to eq(150.20)
+      expect(result).not_to have_key(:P)
+    end
+
+    it "renames p to ask_price" do
+      result = described_class.stock_quote(ticker, raw_stock_quote)
+
+      expect(result[:ask_price]).to eq(150.25)
+      expect(result).not_to have_key(:p)
+    end
+
+    it "renames S to bid_size" do
+      result = described_class.stock_quote(ticker, raw_stock_quote)
+
+      expect(result[:bid_size]).to eq(300)
+      expect(result).not_to have_key(:S)
+    end
+
+    it "renames s to ask_size" do
+      result = described_class.stock_quote(ticker, raw_stock_quote)
+
+      expect(result[:ask_size]).to eq(200)
+      expect(result).not_to have_key(:s)
+    end
+
+    it "renames x to bid_exchange" do
+      result = described_class.stock_quote(ticker, raw_stock_quote)
+
+      expect(result[:bid_exchange]).to eq(4)
+      expect(result).not_to have_key(:x)
+    end
+
+    it "renames X to ask_exchange" do
+      result = described_class.stock_quote(ticker, raw_stock_quote)
+
+      expect(result[:ask_exchange]).to eq(11)
+      expect(result).not_to have_key(:X)
+    end
+
+    it "renames c to conditions" do
+      result = described_class.stock_quote(ticker, raw_stock_quote)
+
+      expect(result[:conditions]).to eq([1])
+      expect(result).not_to have_key(:c)
+    end
+
+    it "renames sip_timestamp to timestamp (overriding convert_timestamp)" do
+      result = described_class.stock_quote(ticker, raw_stock_quote)
+
+      # Due to rename_keys overriding the converted timestamp, original value is preserved
+      expect(result[:timestamp]).to eq(1678901234000000000)
+      expect(result).not_to have_key(:sip_timestamp)
+    end
+
+    context "with t field timestamp" do
+      let(:quote_with_t) do
+        {
+          "P" => 150.20,
+          "p" => 150.25,
+          "t" => 1678901234000,
+          "S" => 300,
+          "s" => 200
+        }
+      end
+
+      it "renames t to timestamp" do
+        result = described_class.stock_quote(ticker, quote_with_t)
+
+        expect(result[:timestamp]).to eq(1678901234000)
+        expect(result).not_to have_key(:t)
+      end
+    end
+
+    context "with participant_timestamp only" do
+      let(:quote_with_participant) do
+        {
+          "P" => 150.20,
+          "p" => 150.25,
+          "participant_timestamp" => 1678901234000000000,
+          "S" => 300,
+          "s" => 200
+        }
+      end
+
+      it "uses participant_timestamp for conversion" do
+        result = described_class.stock_quote(ticker, quote_with_participant)
+
+        expect(result[:timestamp]).to be_a(String)
+        expect(result[:participant_timestamp]).to eq(1678901234000000000)
+      end
+    end
+
+    context "without any timestamp fields" do
+      let(:quote_no_timestamp) do
+        {
+          "P" => 150.20,
+          "p" => 150.25,
+          "S" => 300,
+          "s" => 200
+        }
+      end
+
+      it "handles missing timestamp fields" do
+        result = described_class.stock_quote(ticker, quote_no_timestamp)
+
+        expect(result[:timestamp]).to be_nil
+        expect(result[:ticker]).to eq("AAPL")
+        expect(result[:bid_price]).to eq(150.20)
+        expect(result[:ask_price]).to eq(150.25)
+      end
+    end
+
+    context "with partial field coverage" do
+      let(:quote_partial) do
+        {
+          "P" => 150.20,  # Only bid price, no ask
+          "S" => 300,     # Only bid size, no ask
+          "x" => 4        # Only bid exchange, no ask
+        }
+      end
+
+      it "handles partial field coverage" do
+        result = described_class.stock_quote(ticker, quote_partial)
+
+        expect(result[:bid_price]).to eq(150.20)
+        expect(result[:bid_size]).to eq(300)
+        expect(result[:bid_exchange]).to eq(4)
+        expect(result[:ask_price]).to be_nil
+        expect(result[:ask_size]).to be_nil
+        expect(result[:ask_exchange]).to be_nil
+      end
+    end
+  end
+
+  describe ".stock_snapshot" do
+    let(:raw_stock_snapshot) do
+      {
+        "ticker" => "AAPL",
+        "todaysChangePerc" => 1.23,
+        "todaysChange" => 1.85,
+        "updated" => 1678901234000000000,
+        "day" => {
+          "o" => 150.00,
+          "h" => 152.50,
+          "l" => 149.75,
+          "c" => 151.85,
+          "v" => 2500000
+        },
+        "prevDay" => {
+          "o" => 149.50,
+          "h" => 151.00,
+          "l" => 148.90,
+          "c" => 150.00,
+          "v" => 2200000
+        },
+        "lastTrade" => {
+          "p" => 151.85,
+          "s" => 100,
+          "t" => 1678901234000000000
+        },
+        "lastQuote" => {
+          "P" => 151.84,
+          "p" => 151.86,
+          "S" => 200,
+          "s" => 150,
+          "t" => 1678901234000000000
+        }
+      }
+    end
+
+    it "converts string keys to symbols" do
+      result = described_class.stock_snapshot(raw_stock_snapshot)
+
+      expect(result.keys).to all(be_a(Symbol))
+    end
+
+    it "renames day to daily_bar" do
+      result = described_class.stock_snapshot(raw_stock_snapshot)
+
+      expect(result[:daily_bar]).to eq({
+        "o" => 150.00,
+        "h" => 152.50,
+        "l" => 149.75,
+        "c" => 151.85,
+        "v" => 2500000
+      })
+      expect(result).not_to have_key(:day)
+    end
+
+    it "renames prevDay to prev_daily_bar" do
+      result = described_class.stock_snapshot(raw_stock_snapshot)
+
+      expect(result[:prev_daily_bar]).to eq({
+        "o" => 149.50,
+        "h" => 151.00,
+        "l" => 148.90,
+        "c" => 150.00,
+        "v" => 2200000
+      })
+      expect(result).not_to have_key(:prevDay)
+    end
+
+    it "renames lastTrade to last_trade" do
+      result = described_class.stock_snapshot(raw_stock_snapshot)
+
+      expect(result[:last_trade]).to eq({
+        "p" => 151.85,
+        "s" => 100,
+        "t" => 1678901234000000000
+      })
+      expect(result).not_to have_key(:lastTrade)
+    end
+
+    it "renames lastQuote to last_quote" do
+      result = described_class.stock_snapshot(raw_stock_snapshot)
+
+      expect(result[:last_quote]).to eq({
+        "P" => 151.84,
+        "p" => 151.86,
+        "S" => 200,
+        "s" => 150,
+        "t" => 1678901234000000000
+      })
+      expect(result).not_to have_key(:lastQuote)
+    end
+
+    it "preserves updated field" do
+      result = described_class.stock_snapshot(raw_stock_snapshot)
+
+      expect(result[:updated]).to eq(1678901234000000000)
+    end
+
+    it "preserves other snapshot data" do
+      result = described_class.stock_snapshot(raw_stock_snapshot)
+
+      expect(result[:ticker]).to eq("AAPL")
+      expect(result[:todaysChangePerc]).to eq(1.23)
+      expect(result[:todaysChange]).to eq(1.85)
+    end
+
+    context "when nested objects are empty" do
+      let(:snapshot_with_empty_objects) do
+        {
+          "ticker" => "AAPL",
+          "todaysChange" => 1.85,
+          "day" => {},
+          "prevDay" => {},
+          "lastTrade" => {},
+          "lastQuote" => {}
+        }
+      end
+
+      it "removes empty daily_bar object" do
+        result = described_class.stock_snapshot(snapshot_with_empty_objects)
+
+        expect(result).not_to have_key(:daily_bar)
+      end
+
+      it "removes empty prev_daily_bar object" do
+        result = described_class.stock_snapshot(snapshot_with_empty_objects)
+
+        expect(result).not_to have_key(:prev_daily_bar)
+      end
+
+      it "removes empty last_trade object" do
+        result = described_class.stock_snapshot(snapshot_with_empty_objects)
+
+        expect(result).not_to have_key(:last_trade)
+      end
+
+      it "removes empty last_quote object" do
+        result = described_class.stock_snapshot(snapshot_with_empty_objects)
+
+        expect(result).not_to have_key(:last_quote)
+      end
+    end
+
+    context "when nested objects are nil" do
+      let(:snapshot_with_nil_objects) do
+        {
+          "ticker" => "AAPL",
+          "day" => nil,
+          "lastTrade" => nil
+        }
+      end
+
+      it "preserves nil nested objects" do
+        result = described_class.stock_snapshot(snapshot_with_nil_objects)
+
+        expect(result[:daily_bar]).to be_nil
+        expect(result[:last_trade]).to be_nil
+      end
+    end
+
+    context "when only some nested objects are empty" do
+      let(:snapshot_mixed_empty) do
+        {
+          "ticker" => "AAPL",
+          "day" => {"c" => 151.85},
+          "prevDay" => {},
+          "lastTrade" => {"p" => 151.85},
+          "lastQuote" => {}
+        }
+      end
+
+      it "removes only empty objects, preserves non-empty ones" do
+        result = described_class.stock_snapshot(snapshot_mixed_empty)
+
+        expect(result[:daily_bar]).to eq({"c" => 151.85})
+        expect(result[:last_trade]).to eq({"p" => 151.85})
+        expect(result).not_to have_key(:prev_daily_bar)
+        expect(result).not_to have_key(:last_quote)
+      end
+    end
+  end
+
+  describe ".stock_aggregate" do
+    let(:ticker) { "AAPL" }
+    let(:raw_stock_aggregate) do
+      {
+        "o" => 150.00,
+        "h" => 152.50,
+        "l" => 149.75,
+        "c" => 151.85,
+        "v" => 2500000,
+        "vw" => 150.92,
+        "t" => 1678901234000,
+        "n" => 12456
+      }
+    end
+
+    it "adds ticker to the result" do
+      result = described_class.stock_aggregate(ticker, raw_stock_aggregate)
+
+      expect(result[:ticker]).to eq("AAPL")
+    end
+
+    it "renames o to open" do
+      result = described_class.stock_aggregate(ticker, raw_stock_aggregate)
+
+      expect(result[:open]).to eq(150.00)
+      expect(result).not_to have_key(:o)
+    end
+
+    it "renames h to high" do
+      result = described_class.stock_aggregate(ticker, raw_stock_aggregate)
+
+      expect(result[:high]).to eq(152.50)
+      expect(result).not_to have_key(:h)
+    end
+
+    it "renames l to low" do
+      result = described_class.stock_aggregate(ticker, raw_stock_aggregate)
+
+      expect(result[:low]).to eq(149.75)
+      expect(result).not_to have_key(:l)
+    end
+
+    it "renames c to close" do
+      result = described_class.stock_aggregate(ticker, raw_stock_aggregate)
+
+      expect(result[:close]).to eq(151.85)
+      expect(result).not_to have_key(:c)
+    end
+
+    it "renames v to volume" do
+      result = described_class.stock_aggregate(ticker, raw_stock_aggregate)
+
+      expect(result[:volume]).to eq(2500000)
+      expect(result).not_to have_key(:v)
+    end
+
+    it "renames vw to vwap" do
+      result = described_class.stock_aggregate(ticker, raw_stock_aggregate)
+
+      expect(result[:vwap]).to eq(150.92)
+      expect(result).not_to have_key(:vw)
+    end
+
+    it "renames t to timestamp" do
+      result = described_class.stock_aggregate(ticker, raw_stock_aggregate)
+
+      expect(result[:timestamp]).to eq(1678901234000)
+      expect(result).not_to have_key(:t)
+    end
+
+    it "renames n to transactions" do
+      result = described_class.stock_aggregate(ticker, raw_stock_aggregate)
+
+      expect(result[:transactions]).to eq(12456)
+      expect(result).not_to have_key(:n)
+    end
+
+    context "with partial data" do
+      let(:partial_aggregate) do
+        {
+          "o" => 150.00,
+          "c" => 151.85,
+          "v" => 2500000
+        }
+      end
+
+      it "transforms available fields only" do
+        result = described_class.stock_aggregate(ticker, partial_aggregate)
+
+        expect(result[:open]).to eq(150.00)
+        expect(result[:close]).to eq(151.85)
+        expect(result[:volume]).to eq(2500000)
+        expect(result[:ticker]).to eq("AAPL")
+        expect(result[:high]).to be_nil
+        expect(result[:low]).to be_nil
+        expect(result[:vwap]).to be_nil
+      end
+    end
+
+    context "with empty input" do
+      it "handles empty hash" do
+        result = described_class.stock_aggregate(ticker, {})
+
+        expect(result[:ticker]).to eq("AAPL")
+        expect(result.keys.length).to eq(1)
+      end
+    end
+  end
+
+  describe ".stock_daily_summary" do
+    let(:raw_daily_summary) do
+      {
+        "status" => "OK",
+        "request_id" => "abc123",
+        "count" => 1,
+        "queryCount" => 1,
+        "resultsCount" => 1,
+        "afterHours" => {
+          "change" => 0.25,
+          "changePercent" => 0.16,
+          "close" => 152.10
+        },
+        "preMarket" => {
+          "change" => -0.35,
+          "changePercent" => -0.23,
+          "open" => 151.50
+        },
+        "close" => {
+          "o" => 150.00,
+          "h" => 152.50,
+          "l" => 149.75,
+          "c" => 151.85
+        }
+      }
+    end
+
+    it "converts string keys to symbols" do
+      result = described_class.stock_daily_summary(raw_daily_summary)
+
+      expect(result.keys).to all(be_a(Symbol))
+    end
+
+    it "renames queryCount to query_count" do
+      result = described_class.stock_daily_summary(raw_daily_summary)
+
+      expect(result[:query_count]).to eq(1)
+      expect(result).not_to have_key(:queryCount)
+    end
+
+    it "renames resultsCount to result_count" do
+      result = described_class.stock_daily_summary(raw_daily_summary)
+
+      expect(result[:result_count]).to eq(1)
+      expect(result).not_to have_key(:resultsCount)
+    end
+
+    it "renames afterHours to after_hours_close" do
+      result = described_class.stock_daily_summary(raw_daily_summary)
+
+      expect(result[:after_hours_close]).to eq({
+        "change" => 0.25,
+        "changePercent" => 0.16,
+        "close" => 152.10
+      })
+      expect(result).not_to have_key(:afterHours)
+    end
+
+    it "renames preMarket to pre_market_open" do
+      result = described_class.stock_daily_summary(raw_daily_summary)
+
+      expect(result[:pre_market_open]).to eq({
+        "change" => -0.35,
+        "changePercent" => -0.23,
+        "open" => 151.50
+      })
+      expect(result).not_to have_key(:preMarket)
+    end
+
+    it "preserves other fields" do
+      result = described_class.stock_daily_summary(raw_daily_summary)
+
+      expect(result[:status]).to eq("OK")
+      expect(result[:request_id]).to eq("abc123")
+      expect(result[:count]).to eq(1)
+      expect(result[:close]).to eq({
+        "o" => 150.00,
+        "h" => 152.50,
+        "l" => 149.75,
+        "c" => 151.85
+      })
+    end
+
+    context "with minimal data" do
+      let(:minimal_summary) do
+        {
+          "status" => "OK"
+        }
+      end
+
+      it "handles missing camelCase fields" do
+        result = described_class.stock_daily_summary(minimal_summary)
+
+        expect(result[:status]).to eq("OK")
+        expect(result[:query_count]).to be_nil
+        expect(result[:result_count]).to be_nil
+        expect(result[:after_hours_close]).to be_nil
+        expect(result[:pre_market_open]).to be_nil
+      end
+    end
+
+    context "with empty input" do
+      it "handles empty hash" do
+        result = described_class.stock_daily_summary({})
+
+        expect(result).to eq({})
+      end
+    end
+  end
+
+  describe ".convert_timestamp" do
+    # Testing private method by accessing it through send
+    def convert_timestamp(timestamp)
+      described_class.send(:convert_timestamp, timestamp)
+    end
+
+    context "with nanosecond timestamps (> 1e12)" do
+      it "converts nanoseconds to ISO8601 format" do
+        nanosecond_timestamp = 1678901234000000000
+        result = convert_timestamp(nanosecond_timestamp)
+
+        expect(result).to match(/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}\z|\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/)
+        expect(Time.parse(result).to_i).to eq(1678901234)
+      end
+
+      it "handles edge case at boundary" do
+        boundary_timestamp = 1_000_000_000_001  # Just above boundary
+        result = convert_timestamp(boundary_timestamp)
+
+        expect(result).to be_a(String)
+        expect(result).to match(/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}\z|\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/)
+      end
+    end
+
+    context "with millisecond timestamps (< 1e12)" do
+      it "converts milliseconds to ISO8601 format" do
+        # Use a true millisecond timestamp (13 digits is nanoseconds, 10-13 digits varies)
+        millisecond_timestamp = 167890123400  # True milliseconds (12 digits)
+        result = convert_timestamp(millisecond_timestamp)
+
+        expect(result).to match(/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}\z|\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/)
+        expect(Time.parse(result).to_i).to eq(167890123)
+      end
+
+      it "handles second timestamps by treating as milliseconds (< 1e12 boundary)" do
+        second_timestamp = 1678901234  # This gets treated as milliseconds since < 1e12
+        result = convert_timestamp(second_timestamp)
+
+        expect(result).to match(/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}\z|\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/)
+        # When divided by 1000, becomes 1678901 seconds
+        expect(Time.parse(result).to_i).to eq(1678901)
+      end
+    end
+
+    context "with string timestamps" do
+      it "returns string timestamps unchanged" do
+        string_timestamp = "2023-03-15T14:30:34Z"
+        result = convert_timestamp(string_timestamp)
+
+        expect(result).to eq("2023-03-15T14:30:34Z")
+      end
+
+      it "returns any string unchanged" do
+        weird_string = "not-a-timestamp"
+        result = convert_timestamp(weird_string)
+
+        expect(result).to eq("not-a-timestamp")
+      end
+    end
+
+    context "with nil input" do
+      it "returns nil for nil input" do
+        result = convert_timestamp(nil)
+
+        expect(result).to be_nil
+      end
+    end
+
+    context "with other types" do
+      it "converts float to string" do
+        float_input = 123.456
+        result = convert_timestamp(float_input)
+
+        expect(result).to eq("123.456")
+      end
+
+      it "converts symbol to string" do
+        symbol_input = :timestamp
+        result = convert_timestamp(symbol_input)
+
+        expect(result).to eq("timestamp")
+      end
+
+      it "converts boolean to string" do
+        boolean_input = true
+        result = convert_timestamp(boolean_input)
+
+        expect(result).to eq("true")
+      end
+    end
+
+    context "with edge cases for arithmetic" do
+      it "handles zero timestamp" do
+        result = convert_timestamp(0)
+
+        expect(result).to match(/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}\z|\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/)
+        expect(Time.parse(result).to_i).to eq(0)
+      end
+
+      it "handles negative timestamp" do
+        result = convert_timestamp(-1000000)
+
+        expect(result).to match(/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}\z|\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/)
+      end
+
+      it "handles very large timestamp" do
+        large_timestamp = 9999999999000000000
+        result = convert_timestamp(large_timestamp)
+
+        expect(result).to be_a(String)
+        expect(result).to match(/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}\z|\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/)
+      end
+    end
+  end
+
+  # Additional edge case tests for market_status to catch non-hash mutations
+  describe ".market_status edge cases" do
+    context "with non-hash input" do
+      it "returns empty hash for nil input" do
+        result = described_class.market_status(nil)
+
+        expect(result).to eq({})
+      end
+
+      it "returns empty hash for string input" do
+        result = described_class.market_status("not a hash")
+
+        expect(result).to eq({})
+      end
+
+      it "returns empty hash for array input" do
+        result = described_class.market_status([1, 2, 3])
+
+        expect(result).to eq({})
+      end
+
+      it "returns empty hash for numeric input" do
+        result = described_class.market_status(123)
+
+        expect(result).to eq({})
+      end
+
+      it "returns empty hash for boolean input" do
+        result = described_class.market_status(false)
+
+        expect(result).to eq({})
+      end
+    end
+
+    context "with empty hash" do
+      it "handles empty hash correctly" do
+        result = described_class.market_status({})
+
+        expect(result).to eq({})
+      end
+    end
+
+    context "with partial field coverage" do
+      let(:partial_status) do
+        {
+          "market" => "open",
+          "afterHours" => false
+          # Missing earlyHours and indiceGroups
+        }
+      end
+
+      it "transforms available fields only" do
+        result = described_class.market_status(partial_status)
+
+        expect(result[:status]).to eq("open")
+        expect(result[:after_hours]).to eq(false)
+        expect(result[:pre_market]).to be_nil
+        expect(result[:indices]).to be_nil
+      end
+    end
+  end
+
   describe "module structure" do
     it "extends Dry::Transformer::Registry" do
       expect(described_class.singleton_class.included_modules).to include(Dry::Transformer::Registry)

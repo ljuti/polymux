@@ -20,7 +20,9 @@ RSpec.describe Polymux::Api::Options::Quote do
 
   describe "initialization" do
     it "accepts quote data hash" do
-      expect { described_class.new(quote_data) }.not_to raise_error
+      quote_instance = described_class.new(quote_data)
+      expect(quote_instance).to be_a(described_class)
+      expect(quote_instance.ticker).to eq("O:AAPL240315C00150000")
     end
 
     it "transforms keys to symbols" do

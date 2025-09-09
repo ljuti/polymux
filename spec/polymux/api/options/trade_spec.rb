@@ -17,7 +17,9 @@ RSpec.describe Polymux::Api::Options::Trade do
 
   describe "initialization" do
     it "accepts trade data hash" do
-      expect { described_class.new(trade_data) }.not_to raise_error
+      trade_instance = described_class.new(trade_data)
+      expect(trade_instance).to be_a(described_class)
+      expect(trade_instance.ticker).to eq("O:AAPL240315C00150000")
     end
 
     it "transforms keys to symbols" do

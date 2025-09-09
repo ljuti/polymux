@@ -323,6 +323,12 @@ module Polymux
           quality_score >= 90 && completeness >= 95.0
         end
 
+        # Return content type for the file
+        # @return [String] MIME content type
+        def content_type
+          "text/csv"
+        end
+
         # Generate a detailed metadata report
         # @return [String] Human-readable metadata summary
         def detailed_report
@@ -355,6 +361,147 @@ module Polymux
             Span: #{time_span_hours&.round(1) || 'N/A'} hours
           REPORT
         end
+      end
+
+      # Represents a data catalog overview.
+      #
+      # Contains information about available asset classes, data types, 
+      # and overall data coverage across the flat files system.
+      class DataCatalog < Dry::Struct
+        transform_keys(&:to_sym)
+
+        # Available asset classes
+        # @return [Array<String>] Asset class names
+        attribute :asset_classes, Types::Array.of(Types::String)
+
+        # Available data types
+        # @return [Array<String>] Data type names
+        attribute :data_types, Types::Array.of(Types::String)
+
+        # Total number of files available
+        # @return [Integer] File count
+        attribute :total_files, Types::Integer
+
+        # Earliest date with data coverage
+        # @return [Date] Coverage start date
+        attribute :coverage_start, Types::Date
+
+        # Latest date with data coverage
+        # @return [Date] Coverage end date
+        attribute :coverage_end, Types::Date
+      end
+
+      # Represents file availability information.
+      #
+      # Contains details about whether a specific file exists and 
+      # reasons why it might not be available.
+      class FileAvailability < Dry::Struct
+        transform_keys(&:to_sym)
+
+        # Whether the file exists
+        # @return [Boolean] File existence status
+        attribute :exists, Types::Bool
+
+        # Reason why file is not available (if applicable)
+        # @return [Symbol, nil] Reason code
+        attribute :reason, Types::Symbol.optional
+
+        # Nearest date with available data
+        # @return [Date, nil] Alternative date
+        attribute :nearest_available_date, Types::Date.optional
+
+        # Latest date through which data is available
+        # @return [Date, nil] Data availability boundary
+        attribute :data_availability_through, Types::Date.optional
+      end
+
+      # Represents trade data downloaded from flat files.
+      #
+      # Contains parsed trade records with helper methods for analysis.
+      class TradeData < Dry::Struct
+        transform_keys(&:to_sym)
+
+        # Array of trade records
+        # @return [Array] Trade objects
+        attribute :trades, Types::Array
+      end
+
+      # Represents authentication test results.
+      #
+      # Contains information about credential validation status.
+      class AuthenticationResult < Dry::Struct
+        transform_keys(&:to_sym)
+
+        # Whether S3 credentials are valid
+        # @return [Boolean] Credential validity
+        attribute :s3_credentials_valid, Types::Bool
+
+        # Error details if validation failed
+        # @return [String, nil] Error information
+        attribute :error_details, Types::String.optional
+
+        # Recommended action to resolve issues
+        # @return [String, nil] Resolution steps
+        attribute :recommended_action, Types::String.optional
+      end
+
+      # Represents data integrity validation results.
+      #
+      # Contains comprehensive validation information about downloaded data.
+      class IntegrityReport < Dry::Struct
+        transform_keys(&:to_sym)
+
+        # Whether checksum validation passed
+        # @return [Boolean] Checksum validity
+        attribute :checksum_valid, Types::Bool
+
+        # Expected checksum value
+        # @return [String] Expected checksum
+        attribute :expected_checksum, Types::String
+
+        # Actual checksum value
+        # @return [String] Calculated checksum
+        attribute :actual_checksum, Types::String
+
+        # Expected number of records
+        # @return [Integer] Expected record count
+        attribute :expected_record_count, Types::Integer
+
+        # Actual number of records found
+        # @return [Integer] Actual record count
+        attribute :actual_record_count, Types::Integer
+
+        # Whether schema validation passed
+        # @return [Boolean] Schema validity
+        attribute :schema_valid, Types::Bool
+
+        # List of missing required fields
+        # @return [Array<String>] Missing field names
+        attribute :missing_fields, Types::Array.of(Types::String)
+
+        # List of invalid records found
+        # @return [Array] Invalid record details
+        attribute :invalid_records, Types::Array
+
+        # Whether timestamp continuity is maintained
+        # @return [Boolean] Timestamp continuity
+        attribute :timestamp_continuity, Types::Bool
+
+        # List of issues detected during validation
+        # @return [Array<String>] Issue descriptions
+        attribute :issues_detected, Types::Array.of(Types::String)
+
+        # Recommended actions to address issues
+        # @return [Array<String>] Action recommendations
+        attribute :recommended_actions, Types::Array.of(Types::String)
+
+        # Overall validation status
+        # @return [Symbol] Status (:valid, :invalid, :warning)
+        attribute :overall_status, Types::Symbol
+
+        # When validation was performed
+        # @return [Time] Validation timestamp
+        attribute :validation_timestamp, Types.Instance(Time)
       end
     end
   end

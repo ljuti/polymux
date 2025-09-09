@@ -104,7 +104,9 @@ RSpec.describe Polymux::Api::Markets do
 
     describe "initialization" do
       it "accepts status data hash" do
-        expect { described_class::Status.new(status_data) }.not_to raise_error
+        status_instance = described_class::Status.new(status_data)
+        expect(status_instance).to be_a(described_class::Status)
+        expect(status_instance.status).to eq("open")
       end
 
       it "transforms keys to symbols" do
@@ -193,7 +195,9 @@ RSpec.describe Polymux::Api::Markets do
 
     describe "initialization" do
       it "accepts holiday data hash" do
-        expect { described_class::Holidays.new(holiday_data) }.not_to raise_error
+        holiday_instance = described_class::Holidays.new(holiday_data)
+        expect(holiday_instance).to be_a(described_class::Holidays)
+        expect(holiday_instance.name).to eq("Independence Day")
       end
 
       it "transforms keys to symbols" do

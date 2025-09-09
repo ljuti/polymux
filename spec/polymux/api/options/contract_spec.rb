@@ -21,7 +21,9 @@ RSpec.describe Polymux::Api::Options::Contract do
 
   describe "initialization" do
     it "accepts contract data hash" do
-      expect { described_class.new(contract_data) }.not_to raise_error
+      contract_instance = described_class.new(contract_data)
+      expect(contract_instance).to be_a(described_class)
+      expect(contract_instance.contract_type).to eq("call")
     end
 
     it "transforms keys to symbols" do
