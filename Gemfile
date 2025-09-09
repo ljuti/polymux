@@ -13,3 +13,4 @@ gem "webmock"
 gem "timecop"
 
 gem "standard", "~> 1.3"
+gem "mutant-rspec"

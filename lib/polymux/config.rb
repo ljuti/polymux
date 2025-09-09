@@ -14,6 +14,8 @@ module Polymux
   #   # Set environment variables:
   #   # POLYMUX_API_KEY=your_api_key
   #   # POLYMUX_BASE_URL=https://api.polygon.io
+  #   # POLYMUX_S3_ACCESS_KEY_ID=your_s3_access_key
+  #   # POLYMUX_S3_SECRET_ACCESS_KEY=your_s3_secret_key
   #
   #   config = Polymux::Config.new
   #   puts config.api_key  # => "your_api_key"
@@ -21,7 +23,9 @@ module Polymux
   # @example Direct parameter configuration
   #   config = Polymux::Config.new(
   #     api_key: "your_polygon_api_key",
-  #     base_url: "https://api.polygon.io"
+  #     base_url: "https://api.polygon.io",
+  #     s3_access_key_id: "your_s3_access_key",
+  #     s3_secret_access_key: "your_s3_secret_key"
   #   )
   #
   # @example YAML file configuration (config/polymux.yml)
@@ -29,10 +33,14 @@ module Polymux
   #   production:
   #     api_key: <%= ENV['POLYGON_API_KEY'] %>
   #     base_url: https://api.polygon.io
+  #     s3_access_key_id: <%= ENV['POLYGON_S3_ACCESS_KEY_ID'] %>
+  #     s3_secret_access_key: <%= ENV['POLYGON_S3_SECRET_ACCESS_KEY'] %>
   #
   #   development:
   #     api_key: your_dev_api_key
   #     base_url: https://api.polygon.io
+  #     s3_access_key_id: your_dev_s3_access_key
+  #     s3_secret_access_key: your_dev_s3_secret_key
   #
   # @see https://github.com/palkan/anyway_config anyway_config documentation
   class Config < Anyway::Config
@@ -56,6 +64,22 @@ module Polymux
     #
     # @return [String] The base URL (default: "https://api.polygon.io")
     attr_config :base_url
+
+    # S3 Access Key ID for Flat Files authentication.
+    #
+    # Required for accessing Polygon.io's Flat Files via S3-compatible endpoint.
+    # You can obtain S3 credentials from your Polygon.io dashboard.
+    #
+    # @return [String, nil] The S3 access key ID
+    attr_config :s3_access_key_id
+
+    # S3 Secret Access Key for Flat Files authentication.
+    #
+    # Required for accessing Polygon.io's Flat Files via S3-compatible endpoint.
+    # You can obtain S3 credentials from your Polygon.io dashboard.
+    #
+    # @return [String, nil] The S3 secret access key
+    attr_config :s3_secret_access_key
 
     def initialize(**)
       super

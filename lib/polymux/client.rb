@@ -141,6 +141,78 @@ module Polymux
       Api::TechnicalIndicators.new(self)
     end
 
+    # Access Flat Files for bulk historical data downloads.
+    #
+    # Provides efficient access to bulk historical market data through S3-compatible
+    # endpoint, enabling download of entire trading days instead of making hundreds
+    # of thousands of individual REST API requests. Ideal for backtesting, machine
+    # learning, and large-scale quantitative analysis.
+    #
+    # Flat Files eliminate rate limiting concerns and provide massive performance
+    # improvements for bulk data operations. Each file contains a complete day of
+    # market activity for the specified asset class and data type.
+    #
+    # @return [Api::FlatFiles] Flat Files API handler
+    #
+    # @example Basic file discovery and download
+    #   flat_files = client.flat_files
+    #
+    #   # List available stock trade files for backtesting
+    #   files = flat_files.list_files("stocks", "trades", "2024-01-15")
+    #   puts "Found #{files.length} files totaling #{files.sum(&:size_mb).round(2)} MB"
+    #
+    #   # Download specific file for analysis
+    #   file_info = files.first
+    #   result = flat_files.download_file(file_info.key, "/data/#{file_info.suggested_filename}")
+    #   puts "Downloaded #{result[:size]} bytes in #{result[:duration].round(2)} seconds"
+    #
+    # @example Bulk download for quantitative research
+    #   flat_files = client.flat_files
+    #
+    #   # Download a month of stock trades for backtesting
+    #   criteria = {
+    #     asset_class: "stocks",
+    #     data_type: "trades",
+    #     date_range: Date.new(2024, 1, 1)..Date.new(2024, 1, 31)
+    #   }
+    #
+    #   result = flat_files.bulk_download(criteria, "/data/backtesting") do |progress|
+    #     puts "Progress: #{progress[:completed]}/#{progress[:total]} files"
+    #   end
+    #
+    #   puts result.summary
+    #   if result.success?
+    #     puts "Ready for backtesting with #{result.total_size_mb.round(2)} MB"
+    #     puts "Average speed: #{result.average_speed_mbps.round(2)} MB/s"
+    #   end
+    #
+    # @example Cross-asset correlation analysis
+    #   flat_files = client.flat_files
+    #   date = Date.new(2024, 1, 15)
+    #
+    #   # Download synchronized data across asset classes
+    #   stocks_files = flat_files.list_files("stocks", "trades", date)
+    #   options_files = flat_files.list_files("options", "trades", date) 
+    #   crypto_files = flat_files.list_files("crypto", "trades", date)
+    #
+    #   # Bulk download all asset classes for correlation analysis
+    #   all_files = [stocks_files, options_files, crypto_files].flatten
+    #   puts "Downloading #{all_files.length} files for cross-asset analysis"
+    #
+    # @example File metadata inspection before download
+    #   metadata = flat_files.get_file_metadata("stocks/trades/2024/01/15/trades.csv.gz")
+    #   puts metadata.detailed_report
+    #
+    #   if metadata.high_quality? && metadata.record_count > 1_000_000
+    #     puts "High-quality dataset with #{metadata.record_count} records - proceeding with download"
+    #     flat_files.download_file(metadata.key, "/data/#{metadata.suggested_filename}")
+    #   else
+    #     puts "Dataset quality insufficient for analysis"
+    #   end
+    def flat_files
+      Api::FlatFiles::Client.new(self)
+    end
+
     # Get the configured HTTP client for making API requests.
     #
     # The HTTP client is configured with JSON request/response handling,
@@ -185,3 +257,4 @@ end
 
 # Require API modules after Client class is fully defined
 require_relative "api/technical_indicators"
+require_relative "api/flat_files"

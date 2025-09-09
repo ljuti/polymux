@@ -4,7 +4,8 @@ require "spec_helper"
 
 RSpec.describe Polymux do
   it "has a version number" do
-    expect(Polymux.gem_version).not_to be nil
+    expect(Polymux.gem_version).to be_instance_of(Gem::Version)
+    expect(Polymux.gem_version.to_s).not_to be_empty
   end
 
   describe "module structure" do
