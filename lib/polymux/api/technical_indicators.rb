@@ -31,7 +31,7 @@ module Polymux
     # Moving averages (SMA/EMA) provide trend direction, strength, and crossover signals
     # that form the backbone of trend-following strategies.
     #
-    # ### Momentum Analysis  
+    # ### Momentum Analysis
     # RSI identifies momentum extremes and divergences that signal potential reversals
     # or continuation patterns in price movements.
     #
@@ -84,9 +84,9 @@ module Polymux
     # @example Comprehensive trading signal generation
     #   # Get all indicators for comprehensive analysis
     #   sma_20 = indicators.sma("TSLA", window: 20, timespan: "day")
-    #   ema_12 = indicators.ema("TSLA", window: 12, timespan: "day")  
+    #   ema_12 = indicators.ema("TSLA", window: 12, timespan: "day")
     #   rsi = indicators.rsi("TSLA", window: 14, timespan: "day")
-    #   macd = indicators.macd("TSLA", 
+    #   macd = indicators.macd("TSLA",
     #     short_window: 12, long_window: 26, signal_window: 9, timespan: "day")
     #
     #   # Generate comprehensive trading signal
@@ -104,9 +104,9 @@ module Polymux
     #   # Get historical indicators with date range
     #   from_date = "2024-01-01"
     #   to_date = "2024-06-30"
-    #   
-    #   sma_50 = indicators.sma("SPY", 
-    #     window: 50, 
+    #
+    #   sma_50 = indicators.sma("SPY",
+    #     window: 50,
     #     timespan: "day",
     #     timestamp_gte: from_date,
     #     timestamp_lte: to_date
@@ -118,7 +118,7 @@ module Polymux
     #   puts "Trend consistency: #{sma_50.trending_up? ? 'Bullish' : 'Bearish'}"
     #
     # @see SMA Simple Moving Average with trend analysis
-    # @see EMA Exponential Moving Average with momentum detection  
+    # @see EMA Exponential Moving Average with momentum detection
     # @see RSI Relative Strength Index with overbought/oversold analysis
     # @see MACD Moving Average Convergence Divergence with crossover signals
     class TechnicalIndicators < Polymux::Client::PolymuxRestHandler
@@ -156,17 +156,11 @@ module Polymux
       #     puts "Golden cross - bullish signal"
       #   end
       def sma(ticker, window:, timespan:, **options)
-        raise ArgumentError, "Ticker must be a string" unless ticker.is_a?(String)
-        raise ArgumentError, "Window must be a positive integer" unless window.is_a?(Integer) && window > 0
-        raise ArgumentError, "Timespan must be a valid time unit" unless %w[minute hour day week month].include?(timespan)
+        validate_ticker(ticker)
+        validate_window(window)
+        validate_timespan(timespan)
 
-        params = build_indicator_params(window: window, timespan: timespan, **options)
-        url = "/v1/indicators/sma/#{ticker.upcase}"
-
-        _client.http.get(url, params).tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch SMA for #{ticker}" unless response.success?
-          return SMA.from_api(ticker, response.body)
-        end
+        fetch_indicator("sma", SMA, ticker, {window: window, timespan: timespan, **options})
       end
 
       # Get Exponential Moving Average (EMA) for a stock ticker.
@@ -199,17 +193,11 @@ module Polymux
       #     puts "Strong short-term uptrend"
       #   end
       def ema(ticker, window:, timespan:, **options)
-        raise ArgumentError, "Ticker must be a string" unless ticker.is_a?(String)
-        raise ArgumentError, "Window must be a positive integer" unless window.is_a?(Integer) && window > 0
-        raise ArgumentError, "Timespan must be a valid time unit" unless %w[minute hour day week month].include?(timespan)
+        validate_ticker(ticker)
+        validate_window(window)
+        validate_timespan(timespan)
 
-        params = build_indicator_params(window: window, timespan: timespan, **options)
-        url = "/v1/indicators/ema/#{ticker.upcase}"
-
-        _client.http.get(url, params).tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch EMA for #{ticker}" unless response.success?
-          return EMA.from_api(ticker, response.body)
-        end
+        fetch_indicator("ema", EMA, ticker, {window: window, timespan: timespan, **options})
       end
 
       # Get Relative Strength Index (RSI) for a stock ticker.
@@ -247,17 +235,11 @@ module Polymux
       #     puts "Momentum turning positive"
       #   end
       def rsi(ticker, window:, timespan:, **options)
-        raise ArgumentError, "Ticker must be a string" unless ticker.is_a?(String)
-        raise ArgumentError, "Window must be a positive integer" unless window.is_a?(Integer) && window > 0
-        raise ArgumentError, "Timespan must be a valid time unit" unless %w[minute hour day week month].include?(timespan)
+        validate_ticker(ticker)
+        validate_window(window)
+        validate_timespan(timespan)
 
-        params = build_indicator_params(window: window, timespan: timespan, **options)
-        url = "/v1/indicators/rsi/#{ticker.upcase}"
-
-        _client.http.get(url, params).tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch RSI for #{ticker}" unless response.success?
-          return RSI.from_api(ticker, response.body)
-        end
+        fetch_indicator("rsi", RSI, ticker, {window: window, timespan: timespan, **options})
       end
 
       # Get MACD (Moving Average Convergence Divergence) for a stock ticker.
@@ -302,29 +284,71 @@ module Polymux
       #     puts "Momentum strengthening"
       #   end
       def macd(ticker, short_window:, long_window:, signal_window:, timespan:, **options)
-        raise ArgumentError, "Ticker must be a string" unless ticker.is_a?(String)
-        raise ArgumentError, "Short window must be a positive integer" unless short_window.is_a?(Integer) && short_window > 0
-        raise ArgumentError, "Long window must be a positive integer" unless long_window.is_a?(Integer) && long_window > 0
-        raise ArgumentError, "Signal window must be a positive integer" unless signal_window.is_a?(Integer) && signal_window > 0
-        raise ArgumentError, "Short window must be less than long window" unless short_window < long_window
-        raise ArgumentError, "Timespan must be a valid time unit" unless %w[minute hour day week month].include?(timespan)
+        validate_ticker(ticker)
+        validate_macd_windows(short_window, long_window, signal_window)
+        validate_timespan(timespan)
 
-        params = build_indicator_params(
+        fetch_indicator("macd", MACD, ticker, {
           short_window: short_window,
           long_window: long_window,
           signal_window: signal_window,
           timespan: timespan,
           **options
-        )
-        url = "/v1/indicators/macd/#{ticker.upcase}"
-
-        _client.http.get(url, params).tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch MACD for #{ticker}" unless response.success?
-          return MACD.from_api(ticker, response.body)
-        end
+        })
       end
 
       private
+
+      # Template method for fetching technical indicators.
+      # Eliminates duplication in HTTP calls and error handling.
+      #
+      # @param indicator_name [String] Name of the indicator ("sma", "ema", etc.)
+      # @param result_class [Class] The result class to instantiate
+      # @param ticker [String] Stock ticker symbol
+      # @param params_hash [Hash] Parameters for the API request
+      # @return [Object] Instance of the result_class
+      def fetch_indicator(indicator_name, result_class, ticker, params_hash)
+        params = build_indicator_params(**params_hash)
+        url = "/v1/indicators/#{indicator_name}/#{ticker.upcase}"
+
+        response = _client.http.get(url, params)
+        raise Polymux::Api::Error, "Failed to fetch #{indicator_name.upcase} for #{ticker}" unless response.success?
+
+        result_class.from_api(ticker, response.body)
+      end
+
+      # Validates that ticker is a string
+      # @param ticker [Object] The ticker to validate
+      # @raise [ArgumentError] if ticker is not a string
+      def validate_ticker(ticker)
+        raise ArgumentError, "Ticker must be a string" unless ticker.instance_of?(String)
+      end
+
+      # Validates that window is a positive integer
+      # @param window [Object] The window to validate
+      # @raise [ArgumentError] if window is not a positive integer
+      def validate_window(window)
+        raise ArgumentError, "Window must be a positive integer" unless window.instance_of?(Integer) && window > 0
+      end
+
+      # Validates that timespan is one of the allowed values
+      # @param timespan [Object] The timespan to validate
+      # @raise [ArgumentError] if timespan is not valid
+      def validate_timespan(timespan)
+        raise ArgumentError, "Timespan must be a valid time unit" unless %w[minute hour day week month].include?(timespan)
+      end
+
+      # Validates MACD-specific window parameters
+      # @param short_window [Object] The short window to validate
+      # @param long_window [Object] The long window to validate
+      # @param signal_window [Object] The signal window to validate
+      # @raise [ArgumentError] if any window parameter is invalid
+      def validate_macd_windows(short_window, long_window, signal_window)
+        raise ArgumentError, "Short window must be a positive integer" unless short_window.instance_of?(Integer) && short_window > 0
+        raise ArgumentError, "Long window must be a positive integer" unless long_window.instance_of?(Integer) && long_window > 0
+        raise ArgumentError, "Signal window must be a positive integer" unless signal_window.instance_of?(Integer) && signal_window > 0
+        raise ArgumentError, "Short window must be less than long window" unless short_window < long_window
+      end
 
       # Build standardized parameters for technical indicator requests.
       #
@@ -362,11 +386,11 @@ module Polymux
       # with rich analytical methods for trading signal generation.
       #
       # @see Polymux::Api::TechnicalIndicators::SMA Comprehensive SMA analysis
-      # @see Polymux::Api::TechnicalIndicators::EMA Advanced EMA calculations  
+      # @see Polymux::Api::TechnicalIndicators::EMA Advanced EMA calculations
       # @see Polymux::Api::TechnicalIndicators::RSI Momentum and divergence analysis
       # @see Polymux::Api::TechnicalIndicators::MACD Crossover and histogram analysis
       autoload :SMA, "polymux/api/technical_indicators/sma"
-      autoload :EMA, "polymux/api/technical_indicators/ema" 
+      autoload :EMA, "polymux/api/technical_indicators/ema"
       autoload :RSI, "polymux/api/technical_indicators/rsi"
       autoload :MACD, "polymux/api/technical_indicators/macd"
     end
