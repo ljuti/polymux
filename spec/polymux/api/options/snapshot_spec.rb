@@ -347,6 +347,29 @@ RSpec.describe Polymux::Api::Options::Snapshot do
         expect(boundary_snapshot.moneyness).to eq("ITM")
       end
 
+      it "tests 0.01 boundary specifically (mutation-resistant)" do
+        # Test just above 0.01 - should be ITM 
+        above_boundary = Polymux::Api::Options::UnderlyingAsset.new(
+          underlying_asset_data.to_h.merge(price: 152.45 + 0.011) # break_even_price + 0.011 
+        )
+        above_boundary_snapshot = described_class.new(valid_snapshot_data.merge(underlying_asset: above_boundary))
+        expect(above_boundary_snapshot.moneyness).to eq("ITM") # 0.011 is not < 0.01
+        
+        # Test just under 0.01 - should be ATM
+        just_under_boundary = Polymux::Api::Options::UnderlyingAsset.new(
+          underlying_asset_data.to_h.merge(price: 152.45 + 0.009) # break_even_price + 0.009
+        )
+        under_boundary_snapshot = described_class.new(valid_snapshot_data.merge(underlying_asset: just_under_boundary))
+        expect(under_boundary_snapshot.moneyness).to eq("ATM") # 0.009 < 0.01
+        
+        # Test exactly 0.01 - might be imprecise due to floating point, but should test boundary
+        exactly_boundary = Polymux::Api::Options::UnderlyingAsset.new(
+          underlying_asset_data.to_h.merge(price: 152.46) # break_even_price (152.45) + 0.01
+        )
+        boundary_snapshot = described_class.new(valid_snapshot_data.merge(underlying_asset: exactly_boundary))
+        expect(boundary_snapshot.moneyness).to eq("ITM") # Should be ITM since difference >= 0.01
+      end
+
       it "handles negative break-even price" do
         negative_break_even_snapshot = described_class.new(
           valid_snapshot_data.merge(break_even_price: -10.0)

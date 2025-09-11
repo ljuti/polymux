@@ -370,7 +370,7 @@ module Polymux
       # @param date [Object] The date to validate
       # @raise [ArgumentError] if date format is invalid
       def validate_date_format(date)
-        unless date.instance_of?(String) && date.match?(/^\d{4}-\d{2}-\d{2}$/)
+        unless date.instance_of?(String) && date.match?(/^\d{4}-\d{2}-\d{2}\z/)
           raise ArgumentError, "Date must be a String in YYYY-MM-DD format"
         end
       end

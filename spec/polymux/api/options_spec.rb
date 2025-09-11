@@ -235,6 +235,35 @@ RSpec.describe Polymux::Api::Options do
         expect(a_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
           .with(query: {"underlying_ticker" => "AAPL", "contract_type" => "call", "limit" => 50})).to have_been_made.once
       end
+      
+      it "does not modify original options hash (mutation-resistant)" do
+        original_options = {limit: 100}
+        options_copy = original_options.dup
+        
+        stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {underlying_ticker: "AAPL", limit: 100})
+          .to_return(status: 200, body: load_fixture("options_contracts"))
+
+        options_api.contracts("AAPL", original_options)
+        
+        # Original hash should remain unchanged
+        expect(original_options).to eq(options_copy)
+      end
+
+      it "default parameter must be {} not nil for contracts method" do
+        # Mock fetch_collection to verify it's called with a Hash, not nil
+        allow(options_api).to receive(:fetch_collection).and_call_original
+        
+        stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .to_return(status: 200, body: load_fixture("options_contracts"))
+
+        options_api.contracts
+        
+        # Verify fetch_collection was called with a Hash as second parameter
+        expect(options_api).to have_received(:fetch_collection) do |url, options|
+          expect(options).to be_a(Hash)
+        end
+      end
     end
   end
 
@@ -414,6 +443,29 @@ RSpec.describe Polymux::Api::Options do
         expect(chain).to be_an(Array)
         expect(chain.length).to eq(2)
         expect(chain).to all(be_a(Polymux::Api::Options::Snapshot))
+      end
+
+      it "uses default empty hash when options parameter not provided" do
+        stub_request(:get, "https://api.polygon.io/v3/snapshot/options/AAPL")
+          .with(query: {}, headers: {"Authorization" => "Bearer test_key_123"})
+          .to_return(status: 200, body: load_fixture("options_chain"))
+
+        options_api.chain("AAPL")
+        
+        # Verify the request was made with empty params (default {})
+        expect(a_request(:get, "https://api.polygon.io/v3/snapshot/options/AAPL")
+          .with(query: {})).to have_been_made.once
+      end
+
+      it "passes through provided options parameter" do
+        stub_request(:get, "https://api.polygon.io/v3/snapshot/options/AAPL")
+          .with(query: {contract_type: "call"}, headers: {"Authorization" => "Bearer test_key_123"})
+          .to_return(status: 200, body: load_fixture("options_chain"))
+
+        options_api.chain("AAPL", {contract_type: "call"})
+        
+        expect(a_request(:get, "https://api.polygon.io/v3/snapshot/options/AAPL")
+          .with(query: {contract_type: "call"})).to have_been_made.once
       end
     end
 
@@ -636,6 +688,29 @@ RSpec.describe Polymux::Api::Options do
         }.to raise_error(Polymux::Api::Error, "Failed to fetch daily summary for INVALID on 2024-03-14")
       end
     end
+
+    context "date format validation (mutation-resistant)" do
+      it "rejects date with newline at end ($ vs \\z anchor difference)" do
+        # The regex /^\d{4}-\d{2}-\d{2}$/ would incorrectly match "2024-03-14\n"
+        # but /^\d{4}-\d{2}-\d{2}\z/ correctly rejects it
+        expect {
+          options_api.daily_summary("O:AAPL240315C00150000", "2024-03-14\n")
+        }.to raise_error(ArgumentError, "Date must be a String in YYYY-MM-DD format")
+      end
+
+      it "validates exact YYYY-MM-DD format with \\z anchor" do
+        expect {
+          options_api.daily_summary("O:AAPL240315C00150000", "2024-03-14\nADDITIONAL_TEXT")
+        }.to raise_error(ArgumentError, "Date must be a String in YYYY-MM-DD format")
+      end
+
+      it "accepts valid YYYY-MM-DD format" do
+        stub_request(:get, "https://api.polygon.io/v1/open-close/O:AAPL240315C00150000/2024-03-14")
+          .to_return(status: 200, body: load_fixture("options_daily_summary"), headers: {"Content-Type" => "application/json"})
+
+        expect { options_api.daily_summary("O:AAPL240315C00150000", "2024-03-14") }.not_to raise_error
+      end
+    end
   end
 
   describe "#previous_day" do
@@ -701,6 +776,65 @@ RSpec.describe Polymux::Api::Options do
         expect {
           options_api.previous_day("O:AAPL240315C00150000")
         }.to raise_error(Polymux::Api::Options::NoPreviousDataFound, "No previous day data found for O:AAPL240315C00150000")
+      end
+    end
+  end
+
+  describe "graceful degradation behavior" do
+    context "404 handling in contracts endpoint" do
+      before do
+        stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {underlying_ticker: "NONEXISTENT"})
+          .to_return(status: 404)
+      end
+
+      it "returns empty array for 404 on contracts discovery" do
+        result = options_api.contracts("NONEXISTENT")
+        expect(result).to eq([])
+      end
+
+      it "enables graceful degradation with allow_404_graceful_degradation = true" do
+        # This tests the specific parameter position in fetch_collection call
+        result = options_api.contracts("NONEXISTENT")
+        expect(result).to be_an(Array)
+        expect(result).to be_empty
+      end
+
+      it "ensures graceful degradation specifically for contracts but not other endpoints" do
+        # Test that other endpoints would fail with 404 (no graceful degradation)
+        stub_request(:get, "https://api.polygon.io/v3/snapshot/options/NONEXISTENT")
+          .to_return(status: 404)
+
+        expect {
+          options_api.chain("NONEXISTENT")
+        }.to raise_error(Polymux::Api::Error)
+      end
+    end
+
+    context "parameter default behavior (mutation-resistant)" do
+      it "works when no options parameter provided (tests default {})" do
+        stub_request(:get, "https://api.polygon.io/v3/snapshot/options/AAPL")
+          .with(query: {})
+          .to_return(status: 200, body: load_fixture("options_chain"))
+
+        # This should not raise an error - if options defaults to nil, it would fail
+        result = options_api.chain("AAPL")
+        expect(result).to be_an(Array)
+      end
+
+      it "default parameter must be {} not nil (direct mutation test)" do
+        # Mock fetch_collection to verify it's called with a Hash, not nil
+        allow(options_api).to receive(:fetch_collection).and_call_original
+        
+        stub_request(:get, "https://api.polygon.io/v3/snapshot/options/AAPL")
+          .to_return(status: 200, body: load_fixture("options_chain"))
+
+        options_api.chain("AAPL")
+        
+        # Verify fetch_collection was called with a Hash as second parameter
+        expect(options_api).to have_received(:fetch_collection) do |url, options|
+          expect(options).to be_a(Hash)
+        end
       end
     end
   end

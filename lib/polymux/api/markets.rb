@@ -134,7 +134,7 @@ module Polymux
         # Check if any markets are open (regular or extended hours).
         # @return [Boolean] true if markets are open in any capacity
         def open?
-          status != "closed"
+          !status.eql?("closed")
         end
 
         # Check if markets are in extended hours trading.
@@ -149,7 +149,7 @@ module Polymux
         # @return [Status] Transformed status object
         # @api private
         def self.from_api(json)
-          attrs = Api::Transformers.market_status(json)
+          attrs = Transformers.market_status(json)
           new(attrs)
         end
       end

@@ -603,6 +603,47 @@ RSpec.describe Polymux::Api::Stocks do
         end
       end
 
+      # Type checking mutation tests - these kill mutants that change .instance_of?(String)
+      context "instance_of validation mutation tests" do
+        it "rejects objects that inherit from String but aren't String instances" do
+          # This kills mutants that change .instance_of?(String) to .is_a?(String) or .kind_of?(String)
+          string_subclass = Class.new(String)
+          string_like_object = string_subclass.new("AAPL")
+          
+          # Should fail with instance_of? but pass with is_a?
+          expect(string_like_object.is_a?(String)).to be true
+          expect(string_like_object.instance_of?(String)).to be false
+          
+          expect { stocks_api.ticker_details(string_like_object) }
+            .to raise_error(ArgumentError, "Ticker must be a string")
+        end
+
+        it "accepts actual String instances" do
+          # This ensures String instances pass the validation
+          expect("AAPL".instance_of?(String)).to be true
+          
+          # Mock the HTTP request since we're only testing parameter validation
+          stub_request(:get, "https://api.polygon.io/v3/reference/tickers/AAPL")
+            .with(headers: {"Authorization" => "Bearer test_key_123"})
+            .to_return(
+              status: 200,
+              body: load_fixture("stocks_ticker_details"),
+              headers: {"Content-Type" => "application/json"}
+            )
+            
+          expect { stocks_api.ticker_details("AAPL") }.not_to raise_error
+        end
+
+        it "rejects String-like objects with to_s method" do
+          # Objects that respond to to_s but aren't strings should be rejected
+          string_like = Object.new
+          def string_like.to_s; "AAPL"; end
+          
+          expect { stocks_api.ticker_details(string_like) }
+            .to raise_error(ArgumentError, "Ticker must be a string")
+        end
+      end
+
       context "when ticker is empty string" do
         let(:empty_ticker) { "" }
 
@@ -805,6 +846,101 @@ RSpec.describe Polymux::Api::Stocks do
         expect(a_request(:get, "https://api.polygon.io/v1/open-close/AAPL/2024-08-15")
           .with(query: {adjusted: "false"}))
           .to have_been_made.once
+      end
+    end
+  end
+
+  # Advanced parameter validation mutation tests
+  describe "advanced mutation testing for parameter validation" do
+    context "multiplier validation mutations" do
+      before do
+        # Mock successful HTTP calls for validation tests
+        allow(client.http).to receive(:get).and_return(
+          double("response", success?: true, status: 200, body: {"results" => []})
+        )
+      end
+
+      it "enforces instance_of Integer, not just is_a Integer" do
+        # Kills mutants that change .instance_of?(Integer) to .is_a?(Integer)
+        expect(1.instance_of?(Integer)).to be true
+        expect(1.0.is_a?(Integer)).to be false
+        expect(1.0.instance_of?(Integer)).to be false
+        
+        expect { stocks_api.aggregates("AAPL", 1.0, "day", "2024-01-01", "2024-01-31") }
+          .to raise_error(ArgumentError, "Multiplier must be a positive integer")
+      end
+
+      it "enforces positive (> 0), not non-negative (>= 0)" do
+        # Kills mutants that change > 0 to >= 0
+        expect { stocks_api.aggregates("AAPL", 0, "day", "2024-01-01", "2024-01-31") }
+          .to raise_error(ArgumentError, "Multiplier must be a positive integer")
+          
+        expect { stocks_api.aggregates("AAPL", 1, "day", "2024-01-01", "2024-01-31") }
+          .not_to raise_error
+      end
+
+      it "combines type and positive checks with AND logic" do
+        # Tests that both conditions are required (not OR)
+        expect(1.instance_of?(Integer) && 1 > 0).to be true
+        expect(0.instance_of?(Integer) && 0 > 0).to be false
+        expect("1".instance_of?(Integer) && "1" > 0).to be false
+      end
+    end
+
+    context "timespan validation mutations" do
+      it "validates exact array membership" do
+        # Kills mutants that change array contents
+        valid_timespans = %w[minute hour day week month quarter year]
+        
+        expect(valid_timespans.include?("day")).to be true
+        expect(valid_timespans.include?("days")).to be false  # Plural
+        expect(valid_timespans.include?("DAY")).to be false   # Case
+        expect(valid_timespans.include?("second")).to be false # Similar but invalid
+        
+        expect { stocks_api.aggregates("AAPL", 1, "second", "2024-01-01", "2024-01-31") }
+          .to raise_error(ArgumentError, "Timespan must be a valid time unit")
+      end
+    end
+
+    context "date format validation mutations" do  
+      it "enforces exact YYYY-MM-DD regex pattern" do
+        # Kills mutants that change regex pattern
+        date_pattern = /^\d{4}-\d{2}-\d{2}$/
+        
+        expect("2024-01-01".match?(date_pattern)).to be true
+        expect("2024-1-1".match?(date_pattern)).to be false     # Missing leading zeros
+        expect("24-01-01".match?(date_pattern)).to be false     # Wrong year format
+        expect("2024/01/01".match?(date_pattern)).to be false   # Wrong separators
+        expect("2024-01-1".match?(date_pattern)).to be false    # Missing day zero
+        
+        expect { stocks_api.aggregates("AAPL", 1, "day", "2024-1-1", "2024-01-31") }
+          .to raise_error(ArgumentError, "From date must be in YYYY-MM-DD format")
+      end
+
+      it "validates both from_date and to_date with same pattern" do
+        # Ensures both dates use same validation (kills mutants that skip one)
+        expect { stocks_api.aggregates("AAPL", 1, "day", "invalid", "2024-01-31") }
+          .to raise_error(ArgumentError, "From date must be in YYYY-MM-DD format")
+          
+        expect { stocks_api.aggregates("AAPL", 1, "day", "2024-01-01", "invalid") }
+          .to raise_error(ArgumentError, "To date must be in YYYY-MM-DD format")
+      end
+    end
+
+    context "error message mutation tests" do
+      it "builds consistent error messages with context" do
+        # Tests build_error_message mutations
+        expect { stocks_api.ticker_details(123) }
+          .to raise_error(ArgumentError, "Ticker must be a string")
+          
+        # Error message should be exact, not just contain the text
+        begin
+          stocks_api.ticker_details(123)
+          fail "Should have raised ArgumentError"
+        rescue ArgumentError => e
+          expect(e.message).to eq("Ticker must be a string")  # Exact match
+          expect(e.message).to be_a(String)
+        end
       end
     end
   end

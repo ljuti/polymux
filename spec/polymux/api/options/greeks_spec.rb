@@ -94,6 +94,14 @@ RSpec.describe Polymux::Api::Options::Greeks do
         expect(boundary_negative.high_gamma?).to be false
       end
 
+      it "specifically tests 0.05 boundary (mutation-resistant)" do
+        exactly_boundary = described_class.new(valid_greeks_data.merge(gamma: 0.05))
+        expect(exactly_boundary.high_gamma?).to be false
+        
+        just_above_boundary = described_class.new(valid_greeks_data.merge(gamma: 0.05 + 0.00001))
+        expect(just_above_boundary.high_gamma?).to be true
+      end
+
       it "returns true for gamma just above positive boundary" do
         just_above = described_class.new(valid_greeks_data.merge(gamma: 0.050001))
         expect(just_above.high_gamma?).to be true
@@ -167,6 +175,14 @@ RSpec.describe Polymux::Api::Options::Greeks do
         just_above = described_class.new(valid_greeks_data.merge(theta: -0.049999))
         expect(just_above.high_theta_decay?).to be false
       end
+
+      it "specifically tests -0.05 boundary (mutation-resistant)" do
+        exactly_boundary = described_class.new(valid_greeks_data.merge(theta: -0.05))
+        expect(exactly_boundary.high_theta_decay?).to be false
+        
+        just_below_boundary = described_class.new(valid_greeks_data.merge(theta: -0.05 - 0.00001))
+        expect(just_below_boundary.high_theta_decay?).to be true
+      end
     end
   end
 
@@ -220,6 +236,24 @@ RSpec.describe Polymux::Api::Options::Greeks do
     context "correcting the test expectation" do
       it "returns true for default vega of 0.15" do
         expect(greeks.high_vega?).to be true # 0.15 > 0.10
+      end
+    end
+
+    context "boundary value testing for 0.10 threshold" do
+      it "specifically tests 0.10 boundary (mutation-resistant)" do
+        exactly_boundary = described_class.new(valid_greeks_data.merge(vega: 0.10))
+        expect(exactly_boundary.high_vega?).to be false
+        
+        just_above_boundary = described_class.new(valid_greeks_data.merge(vega: 0.10 + 0.00001))
+        expect(just_above_boundary.high_vega?).to be true
+      end
+
+      it "handles negative vega at boundary" do
+        exactly_negative_boundary = described_class.new(valid_greeks_data.merge(vega: -0.10))
+        expect(exactly_negative_boundary.high_vega?).to be false
+        
+        just_below_negative_boundary = described_class.new(valid_greeks_data.merge(vega: -0.10 - 0.00001))
+        expect(just_below_negative_boundary.high_vega?).to be true
       end
     end
   end

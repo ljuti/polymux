@@ -81,6 +81,33 @@ RSpec.describe Polymux::Api::Stocks::Quote do
         crossed_quote = described_class.new(ticker: "TEST", bid_price: 100.05, ask_price: 100.00)
         expect(crossed_quote.spread).to eq(-0.05)
       end
+
+      # Precision mutation tests - kill mutants that change .round(10) to .round(9), .round(11), no rounding
+      it "maintains 10 decimal place precision for very small spreads" do
+        tiny_spread_quote = described_class.new(ticker: "TEST", bid_price: 100.1234567890, ask_price: 100.1234567891)
+        expected_spread = 0.0000000001  # 1e-10 - exactly 10 decimal places
+        expect(tiny_spread_quote.spread).to eq(expected_spread)
+      end
+
+      it "rounds correctly at 10 decimal places for floating point calculations" do
+        # This kills mutants that change rounding precision
+        fp_quote = described_class.new(ticker: "TEST", bid_price: 1.0/3.0, ask_price: 2.0/3.0)  # Creates repeating decimals
+        expected_spread = (2.0/3.0 - 1.0/3.0).round(10)  # Should be exactly 10 decimal precision
+        expect(fp_quote.spread).to eq(expected_spread)
+        
+        # Ensure it's actually rounded to 10 places, not more/less
+        spread_str = fp_quote.spread.to_s
+        decimal_places = spread_str.split('.')[1]&.length || 0
+        expect(decimal_places).to be <= 10
+      end
+
+      it "preserves exactness for integer-like spreads with 10 decimal precision" do
+        integer_spread_quote = described_class.new(ticker: "TEST", bid_price: 100.0, ask_price: 105.0)
+        expect(integer_spread_quote.spread).to eq(5.0)
+        
+        # Even for integers, should maintain the same rounding behavior
+        expect(integer_spread_quote.spread).to eq((105.0 - 100.0).round(10))
+      end
     end
 
     context "when bid_price is nil" do
@@ -202,6 +229,35 @@ RSpec.describe Polymux::Api::Stocks::Quote do
       it "handles negative prices" do
         negative_quote = described_class.new(ticker: "TEST", bid_price: -1.0, ask_price: -0.5)
         expect(negative_quote.midpoint).to eq(-0.75)
+      end
+
+      # Precision mutation tests for midpoint - kill mutants that change .round(10)
+      it "maintains 10 decimal place precision for midpoint calculation" do
+        precise_quote = described_class.new(ticker: "TEST", bid_price: 100.1234567890, ask_price: 100.1234567892)
+        expected_midpoint = ((100.1234567890 + 100.1234567892) / 2.0).round(10)
+        expect(precise_quote.midpoint).to eq(expected_midpoint)
+      end
+
+      it "rounds midpoint correctly with floating point precision issues" do
+        # Creates floating point precision issues that need correct rounding
+        fp_quote = described_class.new(ticker: "TEST", bid_price: 1.0/3.0, ask_price: 2.0/3.0)
+        expected_midpoint = ((1.0/3.0 + 2.0/3.0) / 2.0).round(10)
+        expect(fp_quote.midpoint).to eq(expected_midpoint)
+        
+        # Ensure precision is exactly 10 decimal places, not more/less
+        midpoint_str = fp_quote.midpoint.to_s
+        decimal_places = midpoint_str.split('.')[1]&.length || 0
+        expect(decimal_places).to be <= 10
+      end
+
+      # Division precision test - kills mutants that change the division operation
+      it "uses exact division by 2.0 for midpoint calculation" do
+        test_quote = described_class.new(ticker: "TEST", bid_price: 99.0, ask_price: 101.0)
+        expect(test_quote.midpoint).to eq(100.0)
+        
+        # Verify it's actually (bid + ask) / 2.0, not some other formula
+        manual_midpoint = (99.0 + 101.0) / 2.0
+        expect(test_quote.midpoint).to eq(manual_midpoint)
       end
     end
 

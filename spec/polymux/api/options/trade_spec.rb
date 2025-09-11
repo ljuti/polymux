@@ -225,6 +225,22 @@ RSpec.describe Polymux::Api::Options::Trade do
         expect(large_trade.total_value).to eq(10005000.00)
       end
     end
+
+    context "calculation method mutations (testing specific multipliers)" do
+      it "specifically tests the 100 multiplier in total_value (mutation-resistant)" do
+        test_trade = described_class.new(trade_data.merge(price: 1.0, size: 1.0))
+        
+        expect(test_trade.total_price).to eq(1.00) # price * size
+        expect(test_trade.total_value).to eq(100.00) # price * size * 100
+      end
+
+      it "verifies total_value uses exactly 100 as multiplier" do
+        # If mutant changes 100 to 101, this should fail
+        test_trade = described_class.new(trade_data.merge(price: 2.0, size: 3.0))
+        
+        expect(test_trade.total_value).to eq(600.00) # 2.0 * 3.0 * 100, not 606 (if 101) or other values
+      end
+    end
   end
 
   describe "data structure inheritance" do
