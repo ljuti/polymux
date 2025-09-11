@@ -246,9 +246,9 @@ RSpec.describe Polymux::Api::Options::UnderlyingAsset do
   end
 
   describe "#stale_data?" do
-    it "returns false for recent data by default" do
-      # The test data timestamp is from the past, but we need to mock time
-      expect(underlying_asset.stale_data?).to be true # Default behavior with test data
+    it "returns true for test data from the past" do
+      # The test data timestamp is from the past, should be stale
+      expect(underlying_asset.stale_data?).to be true
     end
 
     context "when last_updated is nil" do
@@ -261,39 +261,100 @@ RSpec.describe Polymux::Api::Options::UnderlyingAsset do
       end
     end
 
-    context "with recent data" do
+    context "boundary testing for 5-minute threshold" do
       around do |example|
         Timecop.freeze(Time.at(1678901234)) do
           example.run
         end
       end
 
-      let(:recent_asset) do
-        # Current time in nanoseconds
-        current_nanos = Time.now.to_f * 1_000_000_000
-        described_class.new(asset_data.merge(last_updated: current_nanos.to_i))
+      it "returns false for data exactly at 5-minute boundary" do
+        five_minutes_ago = (Time.now.to_f - (5 * 60)) * 1_000_000_000
+        boundary_asset = described_class.new(asset_data.merge(last_updated: five_minutes_ago.to_i))
+
+        expect(boundary_asset.stale_data?).to be false
       end
 
-      it "returns false for fresh data" do
-        expect(recent_asset.stale_data?).to be false
+      it "returns true for data just over 5 minutes old" do
+        just_over_five = (Time.now.to_f - (5 * 60 + 1)) * 1_000_000_000
+        stale_asset = described_class.new(asset_data.merge(last_updated: just_over_five.to_i))
+
+        expect(stale_asset.stale_data?).to be true
+      end
+
+      it "returns false for data just under 5 minutes old" do
+        just_under_five = (Time.now.to_f - (5 * 60 - 1)) * 1_000_000_000
+        fresh_asset = described_class.new(asset_data.merge(last_updated: just_under_five.to_i))
+
+        expect(fresh_asset.stale_data?).to be false
+      end
+
+      it "returns false for current time" do
+        current_nanos = Time.now.to_f * 1_000_000_000
+        current_asset = described_class.new(asset_data.merge(last_updated: current_nanos.to_i))
+
+        expect(current_asset.stale_data?).to be false
+      end
+
+      it "returns false for future timestamps" do
+        future_nanos = (Time.now.to_f + 600) * 1_000_000_000 # 10 minutes in future
+        future_asset = described_class.new(asset_data.merge(last_updated: future_nanos.to_i))
+
+        expect(future_asset.stale_data?).to be false
       end
     end
 
-    context "with old data" do
+    context "calculation verification (mutation resistance)" do
       around do |example|
         Timecop.freeze(Time.at(1678901234)) do
           example.run
         end
       end
 
-      let(:old_asset) do
-        # 10 minutes ago in nanoseconds
-        old_nanos = (Time.now.to_f - 600) * 1_000_000_000
-        described_class.new(asset_data.merge(last_updated: old_nanos.to_i))
+      it "performs subtraction correctly (not addition or other operations)" do
+        current_time_nanos = Time.now.to_f * 1_000_000_000
+        six_minutes_ago = current_time_nanos - (6 * 60 * 1_000_000_000) # Subtraction, not addition
+        four_minutes_ago = current_time_nanos - (4 * 60 * 1_000_000_000)
+
+        stale_asset = described_class.new(asset_data.merge(last_updated: six_minutes_ago.to_i))
+        fresh_asset = described_class.new(asset_data.merge(last_updated: four_minutes_ago.to_i))
+
+        expect(stale_asset.stale_data?).to be true
+        expect(fresh_asset.stale_data?).to be false
       end
 
-      it "returns true for stale data" do
-        expect(old_asset.stale_data?).to be true
+      it "uses greater-than comparison (not greater-than-or-equal)" do
+        current_time_nanos = Time.now.to_f * 1_000_000_000
+        exactly_threshold = current_time_nanos - (5 * 60 * 1_000_000_000)
+
+        boundary_asset = described_class.new(asset_data.merge(last_updated: exactly_threshold.to_i))
+
+        # Should be false since it's not > threshold, just equal
+        expect(boundary_asset.stale_data?).to be false
+      end
+    end
+
+    context "edge cases" do
+      around do |example|
+        Timecop.freeze(Time.at(1678901234)) do
+          example.run
+        end
+      end
+
+      it "handles zero timestamp as stale" do
+        zero_asset = described_class.new(asset_data.merge(last_updated: 0))
+        expect(zero_asset.stale_data?).to be true
+      end
+
+      it "handles very large timestamps correctly" do
+        very_old = 1000000000000 # Very old timestamp (year 2001)
+        very_old_asset = described_class.new(asset_data.merge(last_updated: very_old))
+        expect(very_old_asset.stale_data?).to be true
+      end
+
+      it "handles negative timestamps as stale" do
+        negative_asset = described_class.new(asset_data.merge(last_updated: -1000))
+        expect(negative_asset.stale_data?).to be true
       end
     end
   end

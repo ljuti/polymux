@@ -66,19 +66,19 @@ module Polymux
         # Compression format of the file
         # @return [String] Compression type ("gzip", "none")
         def compression
-          key.end_with?('.gz') ? 'gzip' : 'none'
+          key.end_with?(".gz") ? "gzip" : "none"
         end
 
         # Generate a human-readable filename for local storage
         # @return [String] Filename for local download
         def suggested_filename
-          "#{asset_class}_#{data_type}_#{date}.csv#{compression == 'gzip' ? '.gz' : ''}"
+          "#{asset_class}_#{data_type}_#{date}.csv#{(compression == "gzip") ? ".gz" : ""}"
         end
 
         # Check if file is compressed
         # @return [Boolean] true if file is compressed
         def compressed?
-          compression == 'gzip'
+          compression == "gzip"
         end
 
         # Create FileInfo object from S3 object data.
@@ -89,8 +89,8 @@ module Polymux
         def self.from_s3_object(s3_object)
           # Parse key to extract asset_class, data_type, and date
           # Expected format: "stocks/trades/2024/01/15/trades.csv.gz"
-          key_parts = s3_object.key.split('/')
-          
+          key_parts = s3_object.key.split("/")
+
           new(
             key: s3_object.key,
             asset_class: key_parts[0],
@@ -98,7 +98,7 @@ module Polymux
             date: "#{key_parts[2]}-#{key_parts[3]}-#{key_parts[4]}",
             size: s3_object.size,
             last_modified: s3_object.last_modified,
-            etag: s3_object.etag&.gsub('"', ''), # Remove quotes from ETag
+            etag: s3_object.etag&.delete('"'), # Remove quotes from ETag
             record_count: nil # Would need to be populated from metadata if available
           )
         end
@@ -113,7 +113,7 @@ module Polymux
       # @example Bulk download with error handling
       #   criteria = {
       #     asset_class: "stocks",
-      #     data_type: "trades", 
+      #     data_type: "trades",
       #     date_range: "2024-01-01..2024-01-05"
       #   }
       #   result = client.flat_files.bulk_download(criteria, "/data/downloads")
@@ -210,12 +210,12 @@ module Polymux
         # @return [String] Human-readable summary
         def summary
           status = if success?
-                     "SUCCESS"
-                   elsif partial_failure?
-                     "PARTIAL"
-                   else
-                     "FAILED"
-                   end
+            "SUCCESS"
+          elsif partial_failure?
+            "PARTIAL"
+          else
+            "FAILED"
+          end
 
           <<~SUMMARY
             Bulk Download Summary [#{status}]
@@ -262,7 +262,7 @@ module Polymux
         attribute :record_count, Types::Integer.optional
 
         # Number of unique tickers covered
-        # @return [Integer, nil] Ticker count  
+        # @return [Integer, nil] Ticker count
         attribute :ticker_count, Types::Integer.optional
 
         # Earliest timestamp in the dataset
@@ -298,9 +298,9 @@ module Polymux
         attribute :schema_version, Types::String.optional
 
         # Delegate basic file operations to embedded FileInfo
-        def_delegators :file_info, :key, :asset_class, :data_type, :date, 
-                       :size, :size_mb, :last_modified, :etag, :compression,
-                       :suggested_filename, :compressed?
+        def_delegators :file_info, :key, :asset_class, :data_type, :date,
+          :size, :size_mb, :last_modified, :etag, :compression,
+          :suggested_filename, :compressed?
 
         # Calculate data density (records per MB)
         # @return [Float, nil] Records per megabyte
@@ -346,26 +346,26 @@ module Polymux
             Last Modified: #{last_modified}
             
             Data Details:
-            Records: #{record_count&.to_s&.reverse&.gsub(/(\d{3})(?=\d)/, '\\1,')&.reverse || 'N/A'}
-            Tickers: #{ticker_count || 'N/A'}
-            Density: #{records_per_mb&.round(0) || 'N/A'} records/MB
+            Records: #{record_count&.to_s&.reverse&.gsub(/(\d{3})(?=\d)/, '\\1,')&.reverse || "N/A"}
+            Tickers: #{ticker_count || "N/A"}
+            Density: #{records_per_mb&.round(0) || "N/A"} records/MB
             
             Quality Metrics:
-            Quality Score: #{quality_score || 'N/A'}/100
-            Completeness: #{completeness&.round(1) || 'N/A'}%
-            Status: #{high_quality? ? 'HIGH QUALITY' : 'STANDARD'}
+            Quality Score: #{quality_score || "N/A"}/100
+            Completeness: #{completeness&.round(1) || "N/A"}%
+            Status: #{high_quality? ? "HIGH QUALITY" : "STANDARD"}
             
             Time Coverage:
             First: #{first_timestamp}
             Last: #{last_timestamp}
-            Span: #{time_span_hours&.round(1) || 'N/A'} hours
+            Span: #{time_span_hours&.round(1) || "N/A"} hours
           REPORT
         end
       end
 
       # Represents a data catalog overview.
       #
-      # Contains information about available asset classes, data types, 
+      # Contains information about available asset classes, data types,
       # and overall data coverage across the flat files system.
       class DataCatalog < Dry::Struct
         transform_keys(&:to_sym)
@@ -393,7 +393,7 @@ module Polymux
 
       # Represents file availability information.
       #
-      # Contains details about whether a specific file exists and 
+      # Contains details about whether a specific file exists and
       # reasons why it might not be available.
       class FileAvailability < Dry::Struct
         transform_keys(&:to_sym)

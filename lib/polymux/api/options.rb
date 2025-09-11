@@ -74,10 +74,10 @@ module Polymux
       #   )
       def contracts(ticker = nil, options = {})
         options = options.dup
-        options[:underlying_ticker] = ticker if ticker.is_a?(String)
-        request = _client.http.get("/v3/reference/options/contracts", options)
-        return [] unless request.body.is_a?(Hash)
-        request.body.fetch("results", []).map do |contract_json|
+        options[:underlying_ticker] = ticker if ticker.instance_of?(String)
+
+        # Enable graceful degradation for contracts discovery - 404 means "no contracts found"
+        fetch_collection("/v3/reference/options/contracts", options, "results", nil, true) do |contract_json|
           Contract.from_api(contract_json)
         end
       end
@@ -114,11 +114,11 @@ module Polymux
       #   puts "Bid/Ask spread: #{snapshot.last_quote&.bid_price}/#{snapshot.last_quote&.ask_price}"
       #   puts "Implied volatility: #{snapshot.implied_volatility}"
       def snapshot(contract, options = {})
-        raise ArgumentError, "A Contract object must be provided" unless contract.is_a?(Contract)
+        validate_contract(contract)
 
-        _client.http.get("/v3/snapshot/options/#{contract.underlying_ticker}/#{contract.ticker}", options).tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch snapshot for #{contract.ticker}" unless response.success?
-          return Snapshot.from_api(response.body.fetch("results"))
+        url = "/v3/snapshot/options/#{contract.underlying_ticker}/#{contract.ticker}"
+        fetch_single(url, options, "snapshot for #{contract.ticker}") do |response_body|
+          Snapshot.from_api(response_body.fetch("results"))
         end
       end
 
@@ -148,13 +148,11 @@ module Polymux
       #   by_volume = chain.sort_by { |snap| -(snap.daily_bar&.volume || 0) }
       #   puts "Most active: #{by_volume.first.underlying_asset.ticker}"
       def chain(underlying_ticker, options = {})
-        raise ArgumentError, "Underlying ticker must be a string" unless underlying_ticker.is_a?(String)
-        _client.http.get("/v3/snapshot/options/#{underlying_ticker}", options).tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch options chain for #{underlying_ticker}" unless response.success?
+        validate_ticker(underlying_ticker)
 
-          return response.body.fetch("results", []).map do |chain_json|
-            Snapshot.from_api(chain_json)
-          end
+        url = "/v3/snapshot/options/#{underlying_ticker}"
+        fetch_collection(url, options) do |chain_json|
+          Snapshot.from_api(chain_json)
         end
       end
 
@@ -187,15 +185,11 @@ module Polymux
       #   yesterday = (Time.now - 86400).to_i * 1_000_000_000
       #   trades = options.trades(contract, "timestamp.gte" => yesterday.to_s)
       def trades(contract, options = {})
-        raise ArgumentError, "Contract must be a ticker or a Contract object" unless contract.is_a?(String) || contract.is_a?(Contract)
-        ticker = contract.is_a?(Contract) ? contract.ticker : contract
+        ticker = resolve_ticker(contract)
 
-        _client.http.get("/v3/trades/#{ticker}", options).tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch trades for #{ticker}" unless response.success?
-
-          return response.body.fetch("results", []).map do |trade_json|
-            Trade.from_api(ticker, trade_json)
-          end
+        url = "/v3/trades/#{ticker}"
+        fetch_collection(url, options) do |trade_json|
+          Trade.from_api(ticker, trade_json)
         end
       end
 
@@ -231,14 +225,11 @@ module Polymux
       #     end
       #   end
       def quotes(contract, options = {})
-        raise ArgumentError, "Contract must be a ticker or a Contract object" unless contract.is_a?(String) || contract.is_a?(Contract)
-        ticker = contract.is_a?(Contract) ? contract.ticker : contract
+        ticker = resolve_ticker(contract)
 
-        _client.http.get("/v3/quotes/#{ticker}", options).tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch quotes for #{ticker}" unless response.success?
-          return response.body.fetch("results", []).map do |quote_json|
-            Quote.from_api(ticker, quote_json)
-          end
+        url = "/v3/quotes/#{ticker}"
+        fetch_collection(url, options) do |quote_json|
+          Quote.from_api(ticker, quote_json)
         end
       end
 
@@ -269,14 +260,12 @@ module Polymux
       #   range = summary.high - summary.low
       #   puts "Trading range: $#{range.round(4)}"
       def daily_summary(contract, date)
-        raise ArgumentError, "Contract must be a string or a contract object must be provided" unless contract.is_a?(String) || contract.is_a?(Contract)
-        raise ArgumentError, "Date must be a String in YYYY-MM-DD format" unless date.is_a?(String) && date.match?(/^\d{4}-\d{2}-\d{2}$/)
+        ticker = resolve_ticker(contract)
+        validate_date_format(date)
 
-        ticker = contract.is_a?(Contract) ? contract.ticker : contract
-
-        _client.http.get("/v1/open-close/#{ticker}/#{date}").tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch daily summary for #{ticker} on #{date}" unless response.success?
-          return DailySummary.new(response.body.fetch("results", {}))
+        url = "/v1/open-close/#{ticker}/#{date}"
+        fetch_single(url, {}, "daily summary for #{ticker} on #{date}") do |response_body|
+          DailySummary.new(response_body.fetch("results", {}))
         end
       end
 
@@ -309,15 +298,104 @@ module Polymux
       #   range_pct = (daily_range / prev_day.close) * 100
       #   puts "Previous day volatility: #{range_pct.round(2)}%"
       def previous_day(contract)
-        raise ArgumentError, "Contract must be a ticker or a Contract object" unless contract.is_a?(String) || contract.is_a?(Contract)
-        ticker = contract.is_a?(Contract) ? contract.ticker : contract
+        ticker = resolve_ticker(contract)
 
-        _client.http.get("/v2/aggs/ticker/#{ticker}/prev").tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch previous day summary for #{ticker}" unless response.success?
-          raise Polymux::Api::Options::NoPreviousDataFound, "No previous day data found for #{ticker}" if response.body.fetch("results", []).empty?
+        url = "/v2/aggs/ticker/#{ticker}/prev"
+        fetch_single(url, {}, "previous day summary for #{ticker}") do |response_body|
+          results = response_body.fetch("results", [])
+          raise Polymux::Api::Options::NoPreviousDataFound, "No previous day data found for #{ticker}" if results.empty?
 
-          return PreviousDay.from_api(response.body.fetch("results", []).first)
+          PreviousDay.from_api(results.first)
         end
+      end
+
+      private
+
+      # Template method for fetching collections (arrays) of data.
+      # Eliminates duplication in HTTP calls and error handling.
+      #
+      # @param url [String] The API endpoint URL
+      # @param params [Hash] Query parameters
+      # @param results_key [String] Key in response body containing the array (default: "results")
+      # @param error_context [String] Context for error messages (optional)
+      # @param allow_404_graceful_degradation [Boolean] Whether to treat 404 as empty results
+      # @yield [item_json] Block to transform each item in the results array
+      # @return [Array] Array of transformed objects
+      def fetch_collection(url, params = {}, results_key = "results", error_context = nil, allow_404_graceful_degradation = false, &block)
+        response = _client.http.get(url, params)
+
+        # Treat 404 as "no results found" only for discovery/search endpoints
+        # Discovery endpoints should gracefully degrade rather than explode
+        if allow_404_graceful_degradation && response.status == 404
+          return []
+        end
+
+        raise Polymux::Api::Error, build_error_message(error_context, url) unless response.success?
+
+        return [] unless response.body.instance_of?(Hash)
+
+        response.body.fetch(results_key, []).map(&block)
+      end
+
+      # Template method for fetching single objects.
+      # Eliminates duplication in HTTP calls and error handling.
+      #
+      # @param url [String] The API endpoint URL
+      # @param params [Hash] Query parameters
+      # @param error_context [String] Context for error messages
+      # @yield [response_body] Block to transform the response body
+      # @return [Object] Transformed object
+      def fetch_single(url, params = {}, error_context = nil, &block)
+        response = _client.http.get(url, params)
+        raise Polymux::Api::Error, build_error_message(error_context, url) unless response.success?
+
+        block.call(response.body)
+      end
+
+      # Validates that ticker is a string using explicit type checking.
+      # @param ticker [Object] The ticker to validate
+      # @raise [ArgumentError] if ticker is not a string
+      def validate_ticker(ticker)
+        raise ArgumentError, "Underlying ticker must be a string" unless ticker.instance_of?(String)
+      end
+
+      # Validates that contract is a Contract object using explicit type checking.
+      # @param contract [Object] The contract to validate
+      # @raise [ArgumentError] if contract is not a Contract object
+      def validate_contract(contract)
+        raise ArgumentError, "A Contract object must be provided" unless contract.instance_of?(Contract)
+      end
+
+      # Validates date format using explicit pattern matching.
+      # @param date [Object] The date to validate
+      # @raise [ArgumentError] if date format is invalid
+      def validate_date_format(date)
+        unless date.instance_of?(String) && date.match?(/^\d{4}-\d{2}-\d{2}$/)
+          raise ArgumentError, "Date must be a String in YYYY-MM-DD format"
+        end
+      end
+
+      # Resolves ticker from either a String or Contract object.
+      # Eliminates duplicate ticker resolution patterns.
+      #
+      # @param contract [String, Contract] Ticker string or Contract object
+      # @return [String] The ticker symbol
+      # @raise [ArgumentError] if contract is neither String nor Contract
+      def resolve_ticker(contract)
+        unless contract.instance_of?(String) || contract.instance_of?(Contract)
+          raise ArgumentError, "Contract must be a ticker or a Contract object"
+        end
+
+        contract.instance_of?(Contract) ? contract.ticker : contract
+      end
+
+      # Builds consistent error messages.
+      # @param context [String, nil] Error context or nil
+      # @param url [String] The URL that failed
+      # @return [String] Formatted error message
+      def build_error_message(context, url)
+        return "API request failed for #{url}" unless context
+        "Failed to fetch #{context}"
       end
     end
   end

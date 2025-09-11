@@ -1,5 +1,7 @@
 require "dry/struct"
 require "polymux/api/transformers"
+require_relative "exchange_mapping"
+require_relative "timestamp_formatting"
 
 module Polymux
   module Api
@@ -21,6 +23,9 @@ module Polymux
       #   puts "Value: $#{trade.total_value}"
       #   puts "Exchange: #{trade.exchange}"
       class Trade < Dry::Struct
+        include ExchangeMapping
+        include TimestampFormatting
+
         transform_keys(&:to_sym)
 
         # Stock ticker symbol
@@ -87,17 +92,7 @@ module Polymux
         def regular_hours?
           return false unless timestamp
 
-          # Parse timestamp and check if between 9:30 AM and 4:00 PM ET
-          begin
-            time = Time.parse(timestamp)
-            # Convert to ET (this is simplified - doesn't handle DST properly)
-            et_time = time.getlocal("-05:00")
-            hour_minute = et_time.hour * 100 + et_time.minute
-
-            hour_minute.between?(930, 1600)
-          rescue
-            false
-          end
+          parse_trading_hours_time&.between?(930, 1600) || false
         end
 
         # Check if this is an extended hours trade.
@@ -109,29 +104,13 @@ module Polymux
         # Get exchange name from exchange code.
         # @return [String] Human-readable exchange name
         def exchange_name
-          case exchange.to_i
-          when 1 then "NYSE"
-          when 2 then "NASDAQ"
-          when 3 then "NYSE MKT"
-          when 4 then "NYSE Arca"
-          when 5 then "BATS"
-          when 6 then "IEX"
-          when 11 then "NASDAQ OMX BX"
-          when 12 then "NASDAQ OMX PSX"
-          else "Unknown (#{exchange})"
-          end
+          map_exchange_code(exchange)
         end
 
         # Format timestamp for display.
         # @return [String] Human-readable timestamp
         def formatted_timestamp
-          return "N/A" unless timestamp
-
-          begin
-            Time.parse(timestamp).strftime("%Y-%m-%d %H:%M:%S")
-          rescue
-            timestamp.to_s
-          end
+          format_timestamp(timestamp)
         end
 
         # Create Trade object from API response data.
@@ -143,6 +122,18 @@ module Polymux
         def self.from_api(ticker, json)
           attrs = Api::Transformers.stock_trade(ticker, json)
           new(attrs)
+        end
+
+        private
+
+        # Parses timestamp and converts to ET hour-minute format for trading hours check.
+        # @return [Integer, nil] Hour-minute in HHMM format (e.g., 1430 for 2:30 PM) or nil if parsing fails
+        def parse_trading_hours_time
+          Time.parse(timestamp.to_s).getlocal("-05:00").then do |et_time|
+            et_time.hour * 100 + et_time.min
+          end
+        rescue ArgumentError, TypeError
+          nil
         end
       end
     end

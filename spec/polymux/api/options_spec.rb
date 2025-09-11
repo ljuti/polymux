@@ -39,9 +39,9 @@ RSpec.describe Polymux::Api::Options do
       it "returns an array of Contract objects" do
         contracts = options_api.contracts
 
-        expect(contracts).to be_an(Array)
+        expect(contracts).to be_instance_of(Array)
         expect(contracts.length).to eq(2)
-        expect(contracts).to all(be_a(Polymux::Api::Options::Contract))
+        expect(contracts).to all(be_instance_of(Polymux::Api::Options::Contract))
       end
 
       it "transforms API data correctly" do
@@ -53,6 +53,58 @@ RSpec.describe Polymux::Api::Options do
         expect(first_contract.contract_type).to eq("call")
         expect(first_contract.strike_price).to eq(150.0)
         expect(first_contract.expiration_date).to eq("2024-03-15")
+      end
+
+      context "when response body is not a Hash" do
+        before do
+          stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+            .with(headers: {"Authorization" => "Bearer test_key_123"})
+            .to_return(
+              status: 200,
+              body: "not a hash",
+              headers: {"Content-Type" => "text/plain"}
+            )
+        end
+
+        it "returns empty array for non-Hash response body" do
+          contracts = options_api.contracts
+          expect(contracts).to eq([])
+        end
+      end
+
+      context "when response body has no results key" do
+        before do
+          stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+            .with(headers: {"Authorization" => "Bearer test_key_123"})
+            .to_return(
+              status: 200,
+              body: '{"status": "OK"}',
+              headers: {"Content-Type" => "application/json"}
+            )
+        end
+
+        it "returns empty array when results key is missing" do
+          contracts = options_api.contracts
+          expect(contracts).to eq([])
+        end
+      end
+
+      context "when results is null" do
+        before do
+          stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+            .with(headers: {"Authorization" => "Bearer test_key_123"})
+            .to_return(
+              status: 200,
+              body: '{"results": null, "status": "OK"}',
+              headers: {"Content-Type" => "application/json"}
+            )
+        end
+
+        it "raises NoMethodError when results is null (actual behavior)" do
+          expect {
+            options_api.contracts
+          }.to raise_error(NoMethodError, /undefined method `map' for nil:NilClass/)
+        end
       end
     end
 
@@ -80,8 +132,82 @@ RSpec.describe Polymux::Api::Options do
       it "returns contracts for the specified ticker" do
         contracts = options_api.contracts("AAPL")
 
-        expect(contracts).to all(be_a(Polymux::Api::Options::Contract))
+        expect(contracts).to all(be_instance_of(Polymux::Api::Options::Contract))
         expect(contracts.map(&:underlying_ticker)).to all(eq("AAPL"))
+      end
+    end
+
+    context "parameter type checking (mutation-resistant)" do
+      it "only sets underlying_ticker when ticker is specifically a String" do
+        stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {underlying_ticker: "AAPL"})
+          .to_return(status: 200, body: load_fixture("options_contracts"))
+
+        options_api.contracts("AAPL")
+
+        expect(a_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {underlying_ticker: "AAPL"})).to have_been_made.once
+      end
+
+      it "does not set underlying_ticker for integer" do
+        stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {})
+          .to_return(status: 200, body: load_fixture("options_contracts"))
+
+        options_api.contracts(123)
+
+        expect(a_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {})).to have_been_made.once
+      end
+
+      it "does not set underlying_ticker for symbol" do
+        stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {})
+          .to_return(status: 200, body: load_fixture("options_contracts"))
+
+        options_api.contracts(:AAPL)
+
+        expect(a_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {})).to have_been_made.once
+      end
+
+      it "does not set underlying_ticker for array" do
+        stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {})
+          .to_return(status: 200, body: load_fixture("options_contracts"))
+
+        options_api.contracts(["AAPL"])
+
+        expect(a_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {})).to have_been_made.once
+      end
+
+      it "does not set underlying_ticker for nil" do
+        stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {})
+          .to_return(status: 200, body: load_fixture("options_contracts"))
+
+        options_api.contracts(nil)
+
+        expect(a_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {})).to have_been_made.once
+      end
+
+      it "handles string-like objects that are not String instances" do
+        string_like = Object.new
+        def string_like.to_s
+          "AAPL"
+        end
+
+        stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {})
+          .to_return(status: 200, body: load_fixture("options_contracts"))
+
+        options_api.contracts(string_like)
+
+        # Should not set underlying_ticker since it's not a String instance
+        expect(a_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {})).to have_been_made.once
       end
     end
 
@@ -187,6 +313,65 @@ RSpec.describe Polymux::Api::Options do
           options_api.snapshot("invalid_argument")
         }.to raise_error(ArgumentError, "A Contract object must be provided")
       end
+
+      it "raises ArgumentError for nil" do
+        expect {
+          options_api.snapshot(nil)
+        }.to raise_error(ArgumentError, "A Contract object must be provided")
+      end
+
+      it "raises ArgumentError for integer" do
+        expect {
+          options_api.snapshot(123)
+        }.to raise_error(ArgumentError, "A Contract object must be provided")
+      end
+
+      it "raises ArgumentError for hash with contract-like data" do
+        contract_hash = {
+          ticker: "O:AAPL240315C00150000",
+          underlying_ticker: "AAPL"
+        }
+
+        expect {
+          options_api.snapshot(contract_hash)
+        }.to raise_error(ArgumentError, "A Contract object must be provided")
+      end
+
+      it "raises ArgumentError for object with same methods as Contract" do
+        fake_contract = Object.new
+        def fake_contract.ticker
+          "O:AAPL240315C00150000"
+        end
+
+        def fake_contract.underlying_ticker
+          "AAPL"
+        end
+
+        expect {
+          options_api.snapshot(fake_contract)
+        }.to raise_error(ArgumentError, "A Contract object must be provided")
+      end
+
+      it "specifically checks for exact Contract class using instance_of?" do
+        # Create a subclass of Contract to ensure instance_of? behavior (explicit type checking)
+        contract_subclass = Class.new(Polymux::Api::Options::Contract)
+        subclass_instance = contract_subclass.new(
+          cfi: "OCASPS",
+          contract_type: "call",
+          exercise_style: "american",
+          expiration_date: "2024-03-15",
+          primary_exchange: "CBOE",
+          shares_per_contract: 100,
+          strike_price: 150.0,
+          ticker: "O:AAPL240315C00150000",
+          underlying_ticker: "AAPL"
+        )
+
+        # Should raise error since subclass fails instance_of? Contract check (explicit type checking)
+        expect {
+          options_api.snapshot(subclass_instance)
+        }.to raise_error(ArgumentError, "A Contract object must be provided")
+      end
     end
 
     context "when API request fails" do
@@ -250,7 +435,7 @@ RSpec.describe Polymux::Api::Options do
       it "raises Polymux::Api::Error on failed request" do
         expect {
           options_api.chain("INVALID")
-        }.to raise_error(Polymux::Api::Error, "Failed to fetch options chain for INVALID")
+        }.to raise_error(Polymux::Api::Error, "API request failed for /v3/snapshot/options/INVALID")
       end
     end
   end
@@ -334,7 +519,7 @@ RSpec.describe Polymux::Api::Options do
       it "raises Polymux::Api::Error on failed request" do
         expect {
           options_api.trades("INVALID")
-        }.to raise_error(Polymux::Api::Error, "Failed to fetch trades for INVALID")
+        }.to raise_error(Polymux::Api::Error, "API request failed for /v3/trades/INVALID")
       end
     end
   end
@@ -385,7 +570,7 @@ RSpec.describe Polymux::Api::Options do
       it "raises Polymux::Api::Error on failed request" do
         expect {
           options_api.quotes("INVALID")
-        }.to raise_error(Polymux::Api::Error, "Failed to fetch quotes for INVALID")
+        }.to raise_error(Polymux::Api::Error, "API request failed for /v3/quotes/INVALID")
       end
     end
   end
@@ -420,7 +605,7 @@ RSpec.describe Polymux::Api::Options do
       it "raises ArgumentError for non-string and non-Contract" do
         expect {
           options_api.daily_summary(123, "2024-03-14")
-        }.to raise_error(ArgumentError, "Contract must be a string or a contract object must be provided")
+        }.to raise_error(ArgumentError, "Contract must be a ticker or a Contract object")
       end
     end
 

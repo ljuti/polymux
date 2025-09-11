@@ -132,8 +132,7 @@ RSpec.describe Polymux::Api::TechnicalIndicators do
           limit: 1000,
           order: "desc",
           timestamp_gte: "2024-01-01",
-          timestamp_lte: "2024-12-31"
-        )
+          timestamp_lte: "2024-12-31")
 
         expect(a_request(:get, "https://api.polygon.io/v1/indicators/sma/AAPL")
           .with(query: {
@@ -603,12 +602,11 @@ RSpec.describe Polymux::Api::TechnicalIndicators do
       end
 
       it "handles timestamp parameters correctly" do
-        indicators_api.sma("AAPL", 
-          window: 20, 
+        indicators_api.sma("AAPL",
+          window: 20,
           timespan: "day",
           timestamp_gte: "2024-01-01",
-          timestamp_lte: "2024-12-31"
-        )
+          timestamp_lte: "2024-12-31")
 
         expect(a_request(:get, "https://api.polygon.io/v1/indicators/sma/AAPL")
           .with(query: hash_including({
@@ -626,8 +624,7 @@ RSpec.describe Polymux::Api::TechnicalIndicators do
           series_type: "open",
           adjusted: false,
           limit: 100,
-          order: "desc"
-        )
+          order: "desc")
 
         expect(a_request(:get, "https://api.polygon.io/v1/indicators/sma/AAPL")
           .with(query: hash_including({
@@ -649,8 +646,7 @@ RSpec.describe Polymux::Api::TechnicalIndicators do
           short_window: 12,
           long_window: 26,
           signal_window: 9,
-          timespan: "day"
-        )
+          timespan: "day")
 
         expect(a_request(:get, "https://api.polygon.io/v1/indicators/macd/AAPL")
           .with(query: hash_including({

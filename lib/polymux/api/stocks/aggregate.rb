@@ -83,14 +83,14 @@ module Polymux
         # @return [Numeric, nil] Size of the candlestick body
         def body_size
           return nil unless open && close
-          (close - open).abs
+          (close - open).abs.round(10)
         end
 
         # Calculate the bar's range (high - low).
         # @return [Numeric, nil] Full range of the bar
         def range
           return nil unless high && low
-          high - low
+          (high - low).round(10)
         end
 
         # Calculate range as percentage of opening price.
@@ -105,7 +105,7 @@ module Polymux
         def upper_shadow
           return nil unless high && open && close
           body_top = [open, close].max
-          high - body_top
+          (high - body_top).round(10)
         end
 
         # Calculate lower shadow (wick below body).
@@ -113,7 +113,7 @@ module Polymux
         def lower_shadow
           return nil unless low && open && close
           body_bottom = [open, close].min
-          body_bottom - low
+          (body_bottom - low).round(10)
         end
 
         # Calculate percentage change from open to close.
@@ -127,7 +127,7 @@ module Polymux
         # @return [Numeric, nil] Dollar change
         def change_amount
           return nil unless open && close
-          close - open
+          (close - open).round(10)
         end
 
         # Check if this is a high-volume bar (> 2x average).
@@ -165,25 +165,29 @@ module Polymux
         # @return [Boolean] true if close is near high
         def close_near_high?
           return false unless close && high && high > 0
-          (high - close) / high <= 0.02
+          ((high - close) / high * 100).round(4) <= 2.0
         end
 
         # Check if closing price is near low (within 2%).
         # @return [Boolean] true if close is near low
         def close_near_low?
           return false unless close && low && low > 0
-          (close - low) / low <= 0.02
+          ((close - low) / low * 100).round(4) <= 2.0
         end
 
         # Format timestamp as date string.
         # @return [String] Human-readable date
         def formatted_timestamp
           return "N/A" unless timestamp
+          return "N/A" if timestamp.to_s.strip.empty?
+
+          # If timestamp is not a valid number, return as-is
+          return timestamp.to_s unless /^\d+$/.match?(timestamp.to_s)
 
           begin
             # Convert milliseconds to seconds for Time.at
             time_seconds = timestamp.to_i / 1000.0
-            Time.at(time_seconds).strftime("%Y-%m-%d")
+            Time.at(time_seconds).utc.strftime("%Y-%m-%d")
           rescue
             timestamp.to_s
           end
@@ -193,11 +197,15 @@ module Polymux
         # @return [String] Human-readable datetime
         def formatted_datetime
           return "N/A" unless timestamp
+          return "N/A" if timestamp.to_s.strip.empty?
+
+          # If timestamp is not a valid number, return as-is
+          return timestamp.to_s unless /^\d+$/.match?(timestamp.to_s)
 
           begin
             # Convert milliseconds to seconds for Time.at
             time_seconds = timestamp.to_i / 1000.0
-            Time.at(time_seconds).strftime("%Y-%m-%d %H:%M:%S")
+            Time.at(time_seconds).utc.strftime("%Y-%m-%d %H:%M:%S")
           rescue
             timestamp.to_s
           end

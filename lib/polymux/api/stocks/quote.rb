@@ -1,5 +1,7 @@
 require "dry/struct"
 require "polymux/api/transformers"
+require_relative "exchange_mapping"
+require_relative "timestamp_formatting"
 
 module Polymux
   module Api
@@ -20,6 +22,9 @@ module Polymux
       #   puts "Spread: $#{quote.spread} (#{quote.spread_percentage}%)"
       #   puts "Midpoint: $#{quote.midpoint}"
       class Quote < Dry::Struct
+        include ExchangeMapping
+        include TimestampFormatting
+
         transform_keys(&:to_sym)
 
         # Stock ticker symbol
@@ -74,7 +79,7 @@ module Polymux
         # @return [Numeric, nil] Spread in dollars
         def spread
           return nil unless bid_price && ask_price
-          ask_price - bid_price
+          (ask_price - bid_price).round(10)
         end
 
         # Calculate bid/ask spread as percentage of midpoint.
@@ -88,7 +93,7 @@ module Polymux
         # @return [Float, nil] Midpoint price
         def midpoint
           return nil unless bid_price && ask_price
-          (bid_price + ask_price) / 2.0
+          ((bid_price + ask_price) / 2.0).round(10)
         end
 
         # Calculate total bid value.
@@ -122,31 +127,26 @@ module Polymux
         # Check if this quote has size on both sides.
         # @return [Boolean] true if both bid and ask have size
         def two_sided?
-          bid_size && ask_size && bid_size > 0 && ask_size > 0
+          return false unless bid_size && ask_size
+          bid_size > 0 && ask_size > 0
         end
 
         # Get bid exchange name.
         # @return [String] Human-readable bid exchange name
         def bid_exchange_name
-          exchange_name_for(bid_exchange)
+          map_exchange_code(bid_exchange)
         end
 
         # Get ask exchange name.
         # @return [String] Human-readable ask exchange name
         def ask_exchange_name
-          exchange_name_for(ask_exchange)
+          map_exchange_code(ask_exchange)
         end
 
         # Format timestamp for display.
         # @return [String] Human-readable timestamp
         def formatted_timestamp
-          return "N/A" unless timestamp
-
-          begin
-            Time.parse(timestamp).strftime("%Y-%m-%d %H:%M:%S")
-          rescue
-            timestamp.to_s
-          end
+          format_timestamp(timestamp)
         end
 
         # Create Quote object from API response data.
@@ -158,25 +158,6 @@ module Polymux
         def self.from_api(ticker, json)
           attrs = Api::Transformers.stock_quote(ticker, json)
           new(attrs)
-        end
-
-        private
-
-        # Convert exchange code to name.
-        # @param exchange_code [Integer, String, nil] Exchange identifier
-        # @return [String] Exchange name
-        def exchange_name_for(exchange_code)
-          case exchange_code.to_i
-          when 1 then "NYSE"
-          when 2 then "NASDAQ"
-          when 3 then "NYSE MKT"
-          when 4 then "NYSE Arca"
-          when 5 then "BATS"
-          when 6 then "IEX"
-          when 11 then "NASDAQ OMX BX"
-          when 12 then "NASDAQ OMX PSX"
-          else "Unknown (#{exchange_code})"
-          end
         end
       end
     end

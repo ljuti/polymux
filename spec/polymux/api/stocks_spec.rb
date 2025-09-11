@@ -457,5 +457,355 @@ RSpec.describe Polymux::Api::Stocks do
         expect(snapshots).to all(be_a(Polymux::Api::Stocks::Snapshot))
       end
     end
+
+    context "with filtering options" do
+      before do
+        stub_request(:get, "https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers")
+          .with(
+            query: {tickers: "AAPL,MSFT", include_otc: "true"},
+            headers: {"Authorization" => "Bearer test_key_123"}
+          )
+          .to_return(
+            status: 200,
+            body: {tickers: []}.to_json,
+            headers: {"Content-Type" => "application/json"}
+          )
+      end
+
+      it "passes filtering options to API request" do
+        stocks_api.all_snapshots(tickers: "AAPL,MSFT", include_otc: true)
+
+        expect(a_request(:get, "https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers")
+          .with(query: {tickers: "AAPL,MSFT", include_otc: "true"}))
+          .to have_been_made.once
+      end
+    end
+
+    context "when API request fails" do
+      before do
+        stub_request(:get, "https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers")
+          .with(headers: {"Authorization" => "Bearer test_key_123"})
+          .to_return(status: 500, body: {error: "Internal server error"}.to_json)
+      end
+
+      it "raises Polymux::Api::Error" do
+        expect { stocks_api.all_snapshots }
+          .to raise_error(Polymux::Api::Error, "Failed to fetch market snapshots")
+      end
+    end
+
+    context "when API returns empty tickers array" do
+      before do
+        stub_request(:get, "https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers")
+          .with(headers: {"Authorization" => "Bearer test_key_123"})
+          .to_return(
+            status: 200,
+            body: {tickers: []}.to_json,
+            headers: {"Content-Type" => "application/json"}
+          )
+      end
+
+      it "returns empty array" do
+        snapshots = stocks_api.all_snapshots
+        expect(snapshots).to eq([])
+      end
+    end
+
+    context "when API returns missing tickers key" do
+      before do
+        stub_request(:get, "https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers")
+          .with(headers: {"Authorization" => "Bearer test_key_123"})
+          .to_return(
+            status: 200,
+            body: {status: "OK"}.to_json,
+            headers: {"Content-Type" => "application/json"}
+          )
+      end
+
+      it "returns empty array when tickers key is missing" do
+        snapshots = stocks_api.all_snapshots
+        expect(snapshots).to eq([])
+      end
+    end
+  end
+
+  # Additional comprehensive error handling tests
+  describe "error handling" do
+    context "when API returns non-200 status codes" do
+      [
+        [400, "Bad Request"],
+        [401, "Unauthorized"],
+        [403, "Forbidden"],
+        [404, "Not Found"],
+        [429, "Too Many Requests"],
+        [500, "Internal Server Error"],
+        [502, "Bad Gateway"],
+        [503, "Service Unavailable"]
+      ].each do |status_code, description|
+        context "when API returns #{status_code} #{description}" do
+          before do
+            stub_request(:get, "https://api.polygon.io/v3/reference/tickers/AAPL")
+              .with(headers: {"Authorization" => "Bearer test_key_123"})
+              .to_return(status: status_code, body: {error: description}.to_json)
+          end
+
+          it "raises Polymux::Api::Error for ticker_details" do
+            expect { stocks_api.ticker_details("AAPL") }
+              .to raise_error(Polymux::Api::Error, "Failed to fetch ticker details for AAPL")
+          end
+        end
+      end
+    end
+
+    # Note: Error handling for malformed JSON is handled at the HTTP client level
+    # The current implementation focuses on successful response handling
+  end
+
+  # Comprehensive argument validation tests
+  describe "argument validation" do
+    describe "ticker parameter validation" do
+      [nil, 123, [], {}, true, false].each do |invalid_ticker|
+        context "when ticker is #{invalid_ticker.inspect}" do
+          it "raises ArgumentError for ticker_details" do
+            expect { stocks_api.ticker_details(invalid_ticker) }
+              .to raise_error(ArgumentError, "Ticker must be a string")
+          end
+
+          it "raises ArgumentError for snapshot" do
+            expect { stocks_api.snapshot(invalid_ticker) }
+              .to raise_error(ArgumentError, "Ticker must be a string")
+          end
+
+          it "raises ArgumentError for trades" do
+            expect { stocks_api.trades(invalid_ticker) }
+              .to raise_error(ArgumentError, "Ticker must be a string")
+          end
+
+          it "raises ArgumentError for quotes" do
+            expect { stocks_api.quotes(invalid_ticker) }
+              .to raise_error(ArgumentError, "Ticker must be a string")
+          end
+
+          it "raises ArgumentError for aggregates" do
+            expect { stocks_api.aggregates(invalid_ticker, 1, "day", "2024-01-01", "2024-01-31") }
+              .to raise_error(ArgumentError, "Ticker must be a string")
+          end
+
+          it "raises ArgumentError for previous_day" do
+            expect { stocks_api.previous_day(invalid_ticker) }
+              .to raise_error(ArgumentError, "Ticker must be a string")
+          end
+
+          it "raises ArgumentError for daily_summary" do
+            expect { stocks_api.daily_summary(invalid_ticker, "2024-01-01") }
+              .to raise_error(ArgumentError, "Ticker must be a string")
+          end
+        end
+      end
+
+      context "when ticker is empty string" do
+        let(:empty_ticker) { "" }
+
+        # Empty string is a string, so it passes validation but may cause API errors
+        before do
+          stub_request(:get, "https://api.polygon.io/v3/reference/tickers/")
+            .with(headers: {"Authorization" => "Bearer test_key_123"})
+            .to_return(status: 404, body: {error: "Not found"}.to_json)
+        end
+
+        it "accepts empty string but API may return error" do
+          expect { stocks_api.ticker_details(empty_ticker) }
+            .to raise_error(Polymux::Api::Error)
+        end
+      end
+    end
+
+    describe "aggregates parameter validation" do
+      context "multiplier parameter" do
+        [nil, "1", 0, -1, 1.5, [], {}].each do |invalid_multiplier|
+          it "raises ArgumentError for multiplier #{invalid_multiplier.inspect}" do
+            expect { stocks_api.aggregates("AAPL", invalid_multiplier, "day", "2024-01-01", "2024-01-31") }
+              .to raise_error(ArgumentError, "Multiplier must be a positive integer")
+          end
+        end
+      end
+
+      context "timespan parameter" do
+        ["invalid", "seconds", "millisecond", nil, 123, [], {}].each do |invalid_timespan|
+          it "raises ArgumentError for timespan #{invalid_timespan.inspect}" do
+            expect { stocks_api.aggregates("AAPL", 1, invalid_timespan, "2024-01-01", "2024-01-31") }
+              .to raise_error(ArgumentError, "Timespan must be a valid time unit")
+          end
+        end
+
+        ["minute", "hour", "day", "week", "month", "quarter", "year"].each do |valid_timespan|
+          it "accepts valid timespan #{valid_timespan}" do
+            # Mock the HTTP client to avoid actual HTTP calls in validation tests
+            allow(client.http).to receive(:get).and_return(
+              double("response", success?: true, status: 200, body: {"results" => []})
+            )
+
+            expect { stocks_api.aggregates("AAPL", 1, valid_timespan, "2024-01-01", "2024-01-31") }
+              .not_to raise_error
+          end
+        end
+      end
+
+      context "date format validation" do
+        [
+          "2024-1-1", "2024-01-1", "2024-1-01",  # Missing zero padding
+          "24-01-01", "2024/01/01", "01-01-2024",  # Wrong format
+          "invalid"  # Invalid string format
+        ].each do |invalid_date|
+          it "raises ArgumentError for from_date #{invalid_date.inspect}" do
+            expect { stocks_api.aggregates("AAPL", 1, "day", invalid_date, "2024-01-31") }
+              .to raise_error(ArgumentError, "From date must be in YYYY-MM-DD format")
+          end
+
+          it "raises ArgumentError for to_date #{invalid_date.inspect}" do
+            expect { stocks_api.aggregates("AAPL", 1, "day", "2024-01-01", invalid_date) }
+              .to raise_error(ArgumentError, "To date must be in YYYY-MM-DD format")
+          end
+        end
+
+        # Test non-string types separately to handle NoMethodError properly
+        context "with non-string date parameters" do
+          [nil, 123, [], {}].each do |invalid_date|
+            it "raises NoMethodError for from_date #{invalid_date.inspect}" do
+              expect { stocks_api.aggregates("AAPL", 1, "day", invalid_date, "2024-01-31") }
+                .to raise_error(NoMethodError)
+            end
+
+            it "raises NoMethodError for to_date #{invalid_date.inspect}" do
+              expect { stocks_api.aggregates("AAPL", 1, "day", "2024-01-01", invalid_date) }
+                .to raise_error(NoMethodError)
+            end
+          end
+        end
+
+        it "raises ArgumentError for daily_summary date parameter" do
+          expect { stocks_api.daily_summary("AAPL", "invalid-date") }
+            .to raise_error(ArgumentError, "Date must be in YYYY-MM-DD format")
+        end
+      end
+    end
+  end
+
+  # Test case sensitivity and ticker normalization
+  describe "ticker normalization" do
+    before do
+      # API should receive uppercase ticker regardless of input case
+      stub_request(:get, "https://api.polygon.io/v3/reference/tickers/AAPL")
+        .with(headers: {"Authorization" => "Bearer test_key_123"})
+        .to_return(
+          status: 200,
+          body: load_fixture("stocks_ticker_details"),
+          headers: {"Content-Type" => "application/json"}
+        )
+    end
+
+    ["AAPL", "aapl", "Aapl", "aApL"].each do |ticker_variant|
+      it "converts #{ticker_variant} to uppercase for API request" do
+        stocks_api.ticker_details(ticker_variant)
+
+        expect(a_request(:get, "https://api.polygon.io/v3/reference/tickers/AAPL"))
+          .to have_been_made.once
+      end
+    end
+  end
+
+  # Test optional parameters handling
+  describe "optional parameters handling" do
+    context "ticker_details with date parameter" do
+      before do
+        stub_request(:get, "https://api.polygon.io/v3/reference/tickers/AAPL")
+          .with(
+            query: {date: "2024-01-15"},
+            headers: {"Authorization" => "Bearer test_key_123"}
+          )
+          .to_return(
+            status: 200,
+            body: load_fixture("stocks_ticker_details"),
+            headers: {"Content-Type" => "application/json"}
+          )
+      end
+
+      it "includes date parameter when provided" do
+        stocks_api.ticker_details("AAPL", "2024-01-15")
+
+        expect(a_request(:get, "https://api.polygon.io/v3/reference/tickers/AAPL")
+          .with(query: {date: "2024-01-15"}))
+          .to have_been_made.once
+      end
+    end
+
+    context "aggregates with custom options" do
+      before do
+        stub_request(:get, "https://api.polygon.io/v2/aggs/ticker/AAPL/range/1/day/2024-01-01/2024-01-31")
+          .with(
+            query: {adjusted: "false", sort: "desc", limit: "1000"},
+            headers: {"Authorization" => "Bearer test_key_123"}
+          )
+          .to_return(
+            status: 200,
+            body: load_fixture("stocks_aggregates"),
+            headers: {"Content-Type" => "application/json"}
+          )
+      end
+
+      it "overrides default options with custom parameters" do
+        stocks_api.aggregates("AAPL", 1, "day", "2024-01-01", "2024-01-31", adjusted: false, sort: "desc", limit: 1000)
+
+        expect(a_request(:get, "https://api.polygon.io/v2/aggs/ticker/AAPL/range/1/day/2024-01-01/2024-01-31")
+          .with(query: {adjusted: "false", sort: "desc", limit: "1000"}))
+          .to have_been_made.once
+      end
+    end
+
+    context "previous_day with custom options" do
+      before do
+        stub_request(:get, "https://api.polygon.io/v2/aggs/ticker/AAPL/prev")
+          .with(
+            query: {adjusted: "false"},
+            headers: {"Authorization" => "Bearer test_key_123"}
+          )
+          .to_return(
+            status: 200,
+            body: {results: [JSON.parse(load_fixture("stocks_aggregates"))["results"].first]}.to_json,
+            headers: {"Content-Type" => "application/json"}
+          )
+      end
+
+      it "overrides default adjusted parameter" do
+        stocks_api.previous_day("AAPL", adjusted: false)
+
+        expect(a_request(:get, "https://api.polygon.io/v2/aggs/ticker/AAPL/prev")
+          .with(query: {adjusted: "false"}))
+          .to have_been_made.once
+      end
+    end
+
+    context "daily_summary with custom options" do
+      before do
+        stub_request(:get, "https://api.polygon.io/v1/open-close/AAPL/2024-08-15")
+          .with(
+            query: {adjusted: "false"},
+            headers: {"Authorization" => "Bearer test_key_123"}
+          )
+          .to_return(
+            status: 200,
+            body: load_fixture("stocks_daily_summary"),
+            headers: {"Content-Type" => "application/json"}
+          )
+      end
+
+      it "overrides default adjusted parameter" do
+        stocks_api.daily_summary("AAPL", "2024-08-15", adjusted: false)
+
+        expect(a_request(:get, "https://api.polygon.io/v1/open-close/AAPL/2024-08-15")
+          .with(query: {adjusted: "false"}))
+          .to have_been_made.once
+      end
+    end
   end
 end

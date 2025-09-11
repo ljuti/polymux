@@ -153,19 +153,22 @@ module Polymux
         # Check if stock is up for the day.
         # @return [Boolean] true if change is positive
         def up?
-          change_amount && change_amount > 0
+          return false unless change_amount
+          change_amount > 0
         end
 
         # Check if stock is down for the day.
         # @return [Boolean] true if change is negative
         def down?
-          change_amount && change_amount < 0
+          return false unless change_amount
+          change_amount < 0
         end
 
         # Check if stock is unchanged for the day.
         # @return [Boolean] true if change is zero
         def unchanged?
-          change_amount && change_amount == 0
+          return false unless change_amount
+          change_amount == 0
         end
 
         # Check if market is open for this stock.
@@ -178,7 +181,7 @@ module Polymux
         # @return [Numeric, nil] Bid/ask spread
         def spread
           return nil unless bid_price && ask_price
-          ask_price - bid_price
+          (ask_price - bid_price).round(10)
         end
 
         # Calculate spread percentage.
@@ -186,7 +189,7 @@ module Polymux
         def spread_percentage
           return nil unless spread && bid_price && ask_price
           midpoint = (bid_price + ask_price) / 2.0
-          return nil if midpoint == 0
+          return nil if midpoint <= 0
           (spread / midpoint * 100).round(4)
         end
 
@@ -195,8 +198,11 @@ module Polymux
         def formatted_change
           return "N/A" unless change_amount && change_percent
 
-          sign = (change_amount >= 0) ? "+" : ""
-          "#{sign}$#{change_amount.round(2)} (#{sign}#{change_percent.round(2)}%)"
+          if change_amount >= 0
+            "+$#{change_amount.round(2)} (+#{change_percent.round(2)}%)"
+          else
+            "-$#{change_amount.abs.round(2)} (#{change_percent.round(2)}%)"
+          end
         end
 
         # Create Snapshot object from API response data.

@@ -630,7 +630,7 @@ RSpec.describe Polymux::Api::Transformers do
     let(:raw_stock_quote) do
       {
         "P" => 150.20,  # bid_price (capital P)
-        "p" => 150.25,  # ask_price (lowercase p) 
+        "p" => 150.25,  # ask_price (lowercase p)
         "S" => 300,     # bid_size (capital S)
         "s" => 200,     # ask_size (lowercase s)
         "x" => 4,       # bid_exchange
@@ -1845,7 +1845,7 @@ RSpec.describe Polymux::Api::Transformers do
       it "converts nanoseconds to ISO8601" do
         timestamp = 1678901234000000000 # > 1e12, so nanoseconds
         result = described_class.send(:convert_timestamp, timestamp)
-        
+
         expected = Time.at(1678901234000000000 / 1_000_000_000.0).iso8601
         expect(result).to eq(expected)
       end
@@ -1855,7 +1855,7 @@ RSpec.describe Polymux::Api::Transformers do
       it "converts milliseconds to ISO8601" do
         timestamp = 1678901234 # < 1e12, so treated as milliseconds
         result = described_class.send(:convert_timestamp, timestamp)
-        
+
         expected = Time.at(1678901234 / 1_000.0).iso8601
         expect(result).to eq(expected)
       end
@@ -1865,7 +1865,7 @@ RSpec.describe Polymux::Api::Transformers do
       it "converts seconds to ISO8601" do
         timestamp = 1678901234 # Even smaller, treated as seconds
         result = described_class.send(:convert_timestamp, timestamp)
-        
+
         expected = Time.at(1678901234 / 1_000.0).iso8601
         expect(result).to eq(expected)
       end
@@ -1875,7 +1875,7 @@ RSpec.describe Polymux::Api::Transformers do
       it "returns string as-is" do
         timestamp = "2024-01-15T10:30:00Z"
         result = described_class.send(:convert_timestamp, timestamp)
-        
+
         expect(result).to eq("2024-01-15T10:30:00Z")
       end
     end
@@ -1883,7 +1883,7 @@ RSpec.describe Polymux::Api::Transformers do
     context "with nil timestamp" do
       it "returns nil" do
         result = described_class.send(:convert_timestamp, nil)
-        
+
         expect(result).to be_nil
       end
     end
@@ -1892,7 +1892,7 @@ RSpec.describe Polymux::Api::Transformers do
       it "converts to string" do
         timestamp = 12.5
         result = described_class.send(:convert_timestamp, timestamp)
-        
+
         expect(result).to eq("12.5")
       end
     end
@@ -1930,7 +1930,7 @@ RSpec.describe Polymux::Api::Transformers do
     # These tests specifically target [] vs fetch() mutations
     it "symbolize_keys handles missing keys gracefully" do
       result = described_class[:symbolize_keys].call(test_hash)
-      
+
       expect(result[:key1]).to eq("value1")
       expect(result[:key2]).to eq("value2")
       expect(result[:nonexistent]).to be_nil
@@ -1938,7 +1938,7 @@ RSpec.describe Polymux::Api::Transformers do
 
     it "rename_keys handles missing source keys gracefully" do
       result = described_class[:rename_keys].call({key1: "value1"}, {nonexistent: :new_name})
-      
+
       expect(result[:key1]).to eq("value1")
       expect(result[:new_name]).to be_nil
     end
@@ -1947,7 +1947,7 @@ RSpec.describe Polymux::Api::Transformers do
     context "transformer registry access" do
       it "handles symbolize_keys transformation consistently" do
         input = {"test" => "value", "nested" => {"inner" => "data"}}
-        
+
         # These should behave identically with [] or fetch()
         result = described_class[:symbolize_keys].call(input)
         expect(result).to have_key(:test)
@@ -1957,7 +1957,7 @@ RSpec.describe Polymux::Api::Transformers do
       it "handles rename_keys transformation consistently" do
         input = {old_key: "value", keep_key: "keep"}
         renames = {old_key: :new_key, missing_key: :also_missing}
-        
+
         # These should behave identically with [] or fetch()
         result = described_class[:rename_keys].call(input, renames)
         expect(result[:new_key]).to eq("value")
@@ -1968,10 +1968,10 @@ RSpec.describe Polymux::Api::Transformers do
       it "validates that fetch() is used for transformer registry access" do
         # This test ensures our code uses the more explicit fetch() pattern
         input = {"key" => "value"}
-        
+
         # Mock to verify fetch is called instead of []
         expect(described_class).to receive(:fetch).with(:symbolize_keys).and_call_original
-        
+
         described_class.contract(input)
       end
 
@@ -1979,7 +1979,7 @@ RSpec.describe Polymux::Api::Transformers do
         # Ensure the registry has the expected transformer methods
         expect(described_class.respond_to?(:[]))
         expect(described_class.respond_to?(:fetch))
-        
+
         # Verify specific transformers exist
         expect { described_class.fetch(:symbolize_keys) }.not_to raise_error
         expect { described_class.fetch(:rename_keys) }.not_to raise_error
@@ -1992,7 +1992,7 @@ RSpec.describe Polymux::Api::Transformers do
         # Test with timestamp = 0 (falsy but valid)
         raw_quote = {"sip_timestamp" => 0, "ask_price" => 3.30}
         result = described_class.quote(raw_quote)
-        
+
         expect(result[:timestamp]).to eq(0)
         # Should still convert to datetime even with 0 timestamp
         expect(result[:datetime]).to eq(Time.at(0).to_datetime)
@@ -2001,7 +2001,7 @@ RSpec.describe Polymux::Api::Transformers do
       it "handles falsy timestamp values in trade" do
         raw_trade = {"sip_timestamp" => 0, "price" => 3.25}
         result = described_class.trade(raw_trade)
-        
+
         expect(result[:timestamp]).to eq(0)
         expect(result[:datetime]).to eq(Time.at(0).to_datetime)
       end
@@ -2009,7 +2009,7 @@ RSpec.describe Polymux::Api::Transformers do
       it "handles missing timestamp field in stock methods" do
         raw_trade = {"p" => 150.25, "s" => 100}
         result = described_class.stock_trade("AAPL", raw_trade)
-        
+
         expect(result[:timestamp]).to be_nil
         expect(result[:price]).to eq(150.25)
         expect(result[:ticker]).to eq("AAPL")
@@ -2022,7 +2022,7 @@ RSpec.describe Polymux::Api::Transformers do
         # Test exactly at the boundary (1e12)
         boundary_value = 1_000_000_000_000
         result = described_class.send(:convert_timestamp, boundary_value)
-        
+
         # At boundary, should be treated as milliseconds (not nanoseconds)
         expected = Time.at(boundary_value / 1_000.0).iso8601
         expect(result).to eq(expected)
@@ -2031,7 +2031,7 @@ RSpec.describe Polymux::Api::Transformers do
       it "tests just above the boundary" do
         above_boundary = 1_000_000_000_001
         result = described_class.send(:convert_timestamp, above_boundary)
-        
+
         # Above boundary, should be treated as nanoseconds
         expected = Time.at(above_boundary / 1_000_000_000.0).iso8601
         expect(result).to eq(expected)
@@ -2047,17 +2047,17 @@ RSpec.describe Polymux::Api::Transformers do
           {"day" => nil, "lastQuote" => {}, "lastTrade" => nil},
           {"lastQuote" => {}, "lastTrade" => {}}
         ]
-        
+
         scenarios.each do |raw_snapshot|
           result = described_class.snapshot(raw_snapshot)
-          
+
           # Empty hashes should be removed, nil values preserved
           if raw_snapshot["day"] == {}
             expect(result).not_to have_key(:daily_bar)
           elsif raw_snapshot["day"].nil?
             expect(result[:daily_bar]).to be_nil
           end
-          
+
           if raw_snapshot["lastQuote"] == {}
             expect(result).not_to have_key(:last_quote)
           elsif raw_snapshot["lastQuote"].nil?
@@ -2074,10 +2074,10 @@ RSpec.describe Polymux::Api::Transformers do
           {"address" => []},                               # Array to preserve
           {}                                                # Missing address
         ]
-        
+
         test_cases.each do |raw_ticker|
           result = described_class.ticker_details(raw_ticker)
-          
+
           if raw_ticker["address"].is_a?(Hash)
             expect(result[:address]).to be_a(Hash)
             expect(result[:address].keys).to all(be_a(Symbol))

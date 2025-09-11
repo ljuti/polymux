@@ -48,20 +48,20 @@ RSpec.describe Polymux::Client do
     it "instantiates the fully qualified Polymux::Websocket class" do
       # This test catches mutations where Polymux::Websocket becomes Websocket
       expect(Polymux::Websocket).to receive(:new).with(config).and_call_original
-      
+
       # Ensure unqualified Websocket class is not available or would cause issues
       expect(defined?(Websocket)).to be_falsy
-      
+
       # Verify that if Websocket (unqualified) were called, it would fail
       if defined?(::Websocket)
         expect(::Websocket).not_to receive(:new)
       end
-      
+
       websocket = client.websocket
-      
+
       expect(websocket.class.name).to eq("Polymux::Websocket")
       expect(websocket.class.name).not_to eq("Websocket")
-      
+
       # Additional verification that the constant resolution is correct
       expect(websocket.class).to eq(Polymux::Websocket)
       expect(websocket.class).not_to eq(Object.const_get("Websocket")) if defined?(::Websocket)
@@ -77,7 +77,7 @@ RSpec.describe Polymux::Client do
         stub_const("Websocket", double("MockWebsocket"))
         allow(Websocket).to receive(:new).and_raise(NameError, "Unqualified Websocket should not be used")
       end
-      
+
       # This should succeed because it uses Polymux::Websocket, not Websocket
       # Instead of checking for absence of NameError, verify the correct behavior
       websocket = client.websocket
@@ -194,9 +194,9 @@ RSpec.describe Polymux::Client do
     it "initializes TechnicalIndicators with self as argument, not nil" do
       # This test catches mutations where .new(self) becomes .new(nil) or .new
       expect(Polymux::Api::TechnicalIndicators).to receive(:new).with(client).and_call_original
-      
+
       technical_indicators = client.technical_indicators
-      
+
       expect(technical_indicators.send(:_client)).to eq(client)
       expect(technical_indicators.send(:_client)).not_to be_nil
     end
@@ -225,9 +225,9 @@ RSpec.describe Polymux::Client do
     it "initializes FlatFiles Client with self as argument, not nil" do
       # This test catches mutations where .new(self) becomes .new(nil)
       expect(Polymux::Api::FlatFiles::Client).to receive(:new).with(client).and_call_original
-      
+
       flat_files = client.flat_files
-      
+
       expect(flat_files.send(:_client)).to eq(client)
       expect(flat_files.send(:_client)).not_to be_nil
     end
@@ -252,8 +252,8 @@ RSpec.describe Polymux::Client do
     it "configures JSON response parsing with content type regex" do
       # This catches mutations in the content_type parameter
       # Create a mock response to verify content type handling
-      mock_response = double("response", headers: {"content-type" => "application/json"})
-      
+      double("response", headers: {"content-type" => "application/json"})
+
       # Verify that the builder includes response JSON processing
       handlers = http_client.builder.handlers
       expect(handlers).to include(Faraday::Response::Json)
@@ -300,10 +300,10 @@ RSpec.describe Polymux::Client do
           )
 
         stub_request(:get, "https://api.polygon.io/test/xml")
-          .with(headers: {"Authorization" => "Bearer test_key_123"})  
+          .with(headers: {"Authorization" => "Bearer test_key_123"})
           .to_return(
             status: 200,
-            body: '<root><result>success</result></root>',
+            body: "<root><result>success</result></root>",
             headers: {"Content-Type" => "application/xml"}
           )
       end
@@ -311,7 +311,7 @@ RSpec.describe Polymux::Client do
       it "properly parses JSON responses using configured content type regex" do
         # This test catches mutations in JSON_CONTENT_TYPE_REGEX and content_type parameter
         response = http_client.get("/test/json")
-        
+
         expect(response.status).to eq(200)
         expect(response.body).to be_a(Hash)
         expect(response.body["result"]).to eq("success")
@@ -321,7 +321,7 @@ RSpec.describe Polymux::Client do
       it "handles non-JSON content types correctly" do
         # This test verifies the content type regex works with boundaries
         response = http_client.get("/test/xml")
-        
+
         expect(response.status).to eq(200)
         expect(response.body).to be_a(String) # Should not be parsed as JSON
         expect(response.body).to include("<result>success</result>")
@@ -338,7 +338,7 @@ RSpec.describe Polymux::Client do
           )
 
         response = http_client.get("/test/content-type")
-        
+
         # If content_type parameter was removed, this might not be parsed correctly
         expect(response.body).to be_a(Hash)
         expect(response.body["parsed"]).to be true
@@ -349,7 +349,7 @@ RSpec.describe Polymux::Client do
         # This test catches mutations where adapter becomes nil or is removed
         # Instead of checking for absence of errors, verify the response is correct
         response = http_client.get("/test/json")
-        
+
         expect(response).to respond_to(:status)
         expect(response).to respond_to(:body)
         expect(response).to respond_to(:headers)
@@ -362,7 +362,7 @@ RSpec.describe Polymux::Client do
         # This test ensures the middleware stack is properly configured
         response1 = http_client.get("/test/json")
         response2 = http_client.get("/test/json")
-        
+
         expect(response1.body).to be_a(Hash)
         expect(response2.body).to be_a(Hash)
         expect(response1.body).to eq(response2.body)
@@ -412,11 +412,11 @@ RSpec.describe Polymux::Client do
         end
       end
 
-      it "configures HTTP adapter using constant value" do  
+      it "configures HTTP adapter using constant value" do
         # This test verifies the configure_adapter method uses the constant
         expect(described_class::DEFAULT_HTTP_ADAPTER).to eq(Faraday.default_adapter)
         expect(described_class::DEFAULT_HTTP_ADAPTER).not_to be_nil
-        
+
         # Verify the HTTP client responds to adapter methods (requires working adapter)
         expect(http_client).to respond_to(:get)
         expect(http_client).to respond_to(:post)

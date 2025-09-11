@@ -97,7 +97,8 @@ module Polymux
         def stale_data?
           return false unless last_updated
           current_time = Time.now.to_f * 1_000_000_000
-          (current_time - last_updated) > (5 * 60 * 1_000_000_000)
+          threshold_nanos = 5 * 60 * 1_000_000_000
+          (current_time - last_updated) > threshold_nanos
         end
       end
     end

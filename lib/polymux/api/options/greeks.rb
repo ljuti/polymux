@@ -49,31 +49,36 @@ module Polymux
         # High gamma indicates rapid changes in delta.
         # @return [Boolean] true if gamma is present and > 0.05
         def high_gamma?
-          gamma && gamma.abs > 0.05
+          return false unless gamma
+          gamma.abs > 0.05
         end
 
         # Check if this option has significant time decay (theta < -0.05).
         # @return [Boolean] true if theta indicates high daily decay
         def high_theta_decay?
-          theta && theta < -0.05
+          return false unless theta
+          theta < -0.05
         end
 
         # Check if this option is highly sensitive to volatility (vega > 0.10).
         # @return [Boolean] true if vega indicates high volatility sensitivity
         def high_vega?
-          vega && vega.abs > 0.10
+          return false unless vega
+          vega.abs > 0.10
         end
 
         # Check if delta indicates this is likely a call option.
         # @return [Boolean] true if delta is positive (typical for calls)
         def call_like_delta?
-          delta && delta > 0
+          return false unless delta
+          delta > 0
         end
 
         # Check if delta indicates this is likely a put option.
         # @return [Boolean] true if delta is negative (typical for puts)
         def put_like_delta?
-          delta && delta < 0
+          return false unless delta
+          delta < 0
         end
 
         # Get absolute delta value (useful for hedging calculations).

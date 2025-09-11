@@ -273,15 +273,19 @@ module Polymux
             case trend_direction
             when :bullish
               if histogram_increasing?
-                signal.merge!(type: :buy, reason: "bullish_momentum_increasing")
+                signal[:type] = :buy
+                signal[:reason] = "bullish_momentum_increasing"
               else
-                signal.merge!(type: :hold, reason: "bullish_but_weakening")
+                signal[:type] = :hold
+                signal[:reason] = "bullish_but_weakening"
               end
             when :bearish
               if histogram_decreasing? && current_histogram < 0
-                signal.merge!(type: :sell, reason: "bearish_momentum_increasing")
+                signal[:type] = :sell
+                signal[:reason] = "bearish_momentum_increasing"
               else
-                signal.merge!(type: :hold, reason: "bearish_but_weakening")
+                signal[:type] = :hold
+                signal[:reason] = "bearish_but_weakening"
               end
             end
           end

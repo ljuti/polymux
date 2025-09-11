@@ -90,10 +90,10 @@ module Polymux
       #     ticker_lte: "AAPLZ"
       #   )
       def tickers(options = {})
-        options = {active: true, limit: 100}.merge(options)
-        request = _client.http.get("/v3/reference/tickers", options)
-        return [] unless request.body.is_a?(Hash)
-        request.body.fetch("results", []).map do |ticker_json|
+        params = {active: true, limit: 100}.merge(options)
+
+        # Enable graceful degradation for ticker discovery - 404 means "no tickers found"
+        fetch_collection("/v3/reference/tickers", params, "results", nil, true) do |ticker_json|
           Ticker.from_api(ticker_json)
         end
       end
@@ -121,15 +121,13 @@ module Polymux
       # @example Get historical ticker information
       #   historical = stocks.ticker_details("AAPL", "2024-01-01")
       def ticker_details(ticker, date = nil)
-        raise ArgumentError, "Ticker must be a string" unless ticker.is_a?(String)
+        validate_ticker(ticker)
 
         url = "/v3/reference/tickers/#{ticker.upcase}"
-        params = {}
-        params[:date] = date if date
+        params = date ? {date: date} : {}
 
-        _client.http.get(url, params).tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch ticker details for #{ticker}" unless response.success?
-          return TickerDetails.from_api(response.body.fetch("results"))
+        fetch_single(url, params, "ticker details for #{ticker}") do |response_body|
+          TickerDetails.from_api(response_body.fetch("results"))
         end
       end
 
@@ -153,11 +151,12 @@ module Polymux
       #   puts "Daily change: #{snapshot.daily_bar&.change_percent}%"
       #   puts "Volume: #{snapshot.daily_bar&.volume}"
       def snapshot(ticker)
-        raise ArgumentError, "Ticker must be a string" unless ticker.is_a?(String)
+        validate_ticker(ticker)
 
-        _client.http.get("/v2/snapshot/locale/us/markets/stocks/tickers/#{ticker.upcase}").tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch snapshot for #{ticker}" unless response.success?
-          return Snapshot.from_api(response.body.fetch("ticker"))
+        url = "/v2/snapshot/locale/us/markets/stocks/tickers/#{ticker.upcase}"
+
+        fetch_single(url, {}, "snapshot for #{ticker}") do |response_body|
+          Snapshot.from_api(response_body.fetch("ticker"))
         end
       end
 
@@ -182,11 +181,8 @@ module Polymux
       #   gainers = all_snapshots.select { |s| s.daily_bar&.change_percent&.positive? }
       #   puts "Number of gainers: #{gainers.length}"
       def all_snapshots(options = {})
-        _client.http.get("/v2/snapshot/locale/us/markets/stocks/tickers", options).tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch market snapshots" unless response.success?
-          return response.body.fetch("tickers", []).map do |ticker_json|
-            Snapshot.from_api(ticker_json)
-          end
+        fetch_collection("/v2/snapshot/locale/us/markets/stocks/tickers", options, "tickers", "market snapshots") do |ticker_json|
+          Snapshot.from_api(ticker_json)
         end
       end
 
@@ -219,13 +215,12 @@ module Polymux
       #   yesterday = (Time.now - 86400).to_i * 1_000_000_000
       #   trades = stocks.trades("AAPL", "timestamp.gte" => yesterday.to_s)
       def trades(ticker, options = {})
-        raise ArgumentError, "Ticker must be a string" unless ticker.is_a?(String)
+        validate_ticker(ticker)
 
-        _client.http.get("/v3/trades/#{ticker.upcase}", options).tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch trades for #{ticker}" unless response.success?
-          return response.body.fetch("results", []).map do |trade_json|
-            Trade.from_api(ticker, trade_json)
-          end
+        url = "/v3/trades/#{ticker.upcase}"
+
+        fetch_collection(url, options) do |trade_json|
+          Trade.from_api(ticker, trade_json)
         end
       end
 
@@ -254,13 +249,12 @@ module Polymux
       #   avg_spread = spreads.sum / spreads.length
       #   puts "Average spread: $#{avg_spread.round(4)}"
       def quotes(ticker, options = {})
-        raise ArgumentError, "Ticker must be a string" unless ticker.is_a?(String)
+        validate_ticker(ticker)
 
-        _client.http.get("/v3/quotes/#{ticker.upcase}", options).tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch quotes for #{ticker}" unless response.success?
-          return response.body.fetch("results", []).map do |quote_json|
-            Quote.from_api(ticker, quote_json)
-          end
+        url = "/v3/quotes/#{ticker.upcase}"
+
+        fetch_collection(url, options) do |quote_json|
+          Quote.from_api(ticker, quote_json)
         end
       end
 
@@ -300,21 +294,14 @@ module Polymux
       #   daily_returns = daily_bars.each_cons(2).map { |prev, curr| (curr.close - prev.close) / prev.close }
       #   volatility = Math.sqrt(daily_returns.map { |r| r ** 2 }.sum / daily_returns.length)
       def aggregates(ticker, multiplier, timespan, from_date, to_date, options = {})
-        raise ArgumentError, "Ticker must be a string" unless ticker.is_a?(String)
-        raise ArgumentError, "Multiplier must be a positive integer" unless multiplier.is_a?(Integer) && multiplier > 0
-        raise ArgumentError, "Timespan must be a valid time unit" unless %w[minute hour day week month quarter year].include?(timespan)
-        raise ArgumentError, "From date must be in YYYY-MM-DD format" unless from_date.match?(/^\d{4}-\d{2}-\d{2}$/)
-        raise ArgumentError, "To date must be in YYYY-MM-DD format" unless to_date.match?(/^\d{4}-\d{2}-\d{2}$/)
+        validate_ticker(ticker)
+        validate_aggregates_parameters(multiplier, timespan, from_date, to_date)
 
-        options = {adjusted: true, sort: "asc"}.merge(options)
-
+        params = {adjusted: true, sort: "asc"}.merge(options)
         url = "/v2/aggs/ticker/#{ticker.upcase}/range/#{multiplier}/#{timespan}/#{from_date}/#{to_date}"
 
-        _client.http.get(url, options).tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch aggregates for #{ticker}" unless response.success?
-          return response.body.fetch("results", []).map do |agg_json|
-            Aggregate.from_api(ticker, agg_json)
-          end
+        fetch_collection(url, params) do |agg_json|
+          Aggregate.from_api(ticker, agg_json)
         end
       end
 
@@ -343,16 +330,16 @@ module Polymux
       #   puts "Current price: $#{current_snapshot.last_trade.price}"
       #   puts "Change: $#{change.round(2)} (#{change_pct.round(2)}%)"
       def previous_day(ticker, options = {})
-        raise ArgumentError, "Ticker must be a string" unless ticker.is_a?(String)
+        validate_ticker(ticker)
 
-        options = {adjusted: true}.merge(options)
+        params = {adjusted: true}.merge(options)
+        url = "/v2/aggs/ticker/#{ticker.upcase}/prev"
 
-        _client.http.get("/v2/aggs/ticker/#{ticker.upcase}/prev", options).tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch previous day data for #{ticker}" unless response.success?
-          results = response.body.fetch("results", [])
+        fetch_single(url, params, "previous day data for #{ticker}") do |response_body|
+          results = response_body.fetch("results", [])
           raise Polymux::Api::Error, "No previous day data found for #{ticker}" if results.empty?
 
-          return Aggregate.from_api(ticker, results.first)
+          Aggregate.from_api(ticker, results.first)
         end
       end
 
@@ -377,16 +364,103 @@ module Polymux
       #   puts "Close: $#{summary.close}"
       #   puts "After hours close: $#{summary.after_hours_close}"
       def daily_summary(ticker, date, options = {})
-        raise ArgumentError, "Ticker must be a string" unless ticker.is_a?(String)
-        raise ArgumentError, "Date must be in YYYY-MM-DD format" unless date.match?(/^\d{4}-\d{2}-\d{2}$/)
+        validate_ticker(ticker)
+        validate_date_format(date)
 
-        options = {adjusted: true}.merge(options)
+        params = {adjusted: true}.merge(options)
+        url = "/v1/open-close/#{ticker.upcase}/#{date}"
 
-        _client.http.get("/v1/open-close/#{ticker.upcase}/#{date}", options).tap do |response|
-          raise Polymux::Api::Error, "Failed to fetch daily summary for #{ticker} on #{date}" unless response.success?
-          return DailySummary.from_api(response.body)
+        fetch_single(url, params, "daily summary for #{ticker} on #{date}") do |response_body|
+          DailySummary.from_api(response_body)
         end
       end
+
+      private
+
+      # Template method for fetching collections (arrays) of data.
+      #
+      # @param url [String] The API endpoint URL
+      # @param params [Hash] Query parameters
+      # @param results_key [String] Key in response body containing the array (default: "results")
+      # @param error_message [String] Context for error messages (optional)
+      # @param allow_404_graceful_degradation [Boolean] Whether to treat 404 as empty results
+      # @yield [item_json] Block to transform each item in the results array
+      # @return [Array] Array of transformed objects
+      def fetch_collection(url, params = {}, results_key = "results", error_message = nil, allow_404_graceful_degradation = false, &block)
+        response = _client.http.get(url, params)
+
+        # Treat 404 as "no results found" only for discovery/search endpoints
+        # Discovery endpoints should gracefully degrade rather than explode
+        if allow_404_graceful_degradation && response.status == 404
+          return []
+        end
+
+        raise Polymux::Api::Error, build_error_message(error_message, url) unless response.success?
+
+        return [] unless response.body.instance_of?(Hash)
+
+        response.body.fetch(results_key, []).map(&block)
+      end
+
+      # Template method for fetching single objects.
+      #
+      # @param url [String] The API endpoint URL
+      # @param params [Hash] Query parameters
+      # @param error_context [String] Context for error messages
+      # @yield [response_body] Block to transform the response body
+      # @return [Object] Transformed object
+      def fetch_single(url, params = {}, error_context = nil, &block)
+        response = _client.http.get(url, params)
+        raise Polymux::Api::Error, build_error_message(error_context, url) unless response.success?
+
+        block.call(response.body)
+      end
+
+      # Validates that ticker is a string using explicit type checking.
+      # @param ticker [Object] The ticker to validate
+      # @raise [ArgumentError] if ticker is not a string
+      def validate_ticker(ticker)
+        raise ArgumentError, "Ticker must be a string" unless ticker.instance_of?(String)
+      end
+
+      # Validates parameters for aggregates method.
+      # @param multiplier [Object] The multiplier to validate
+      # @param timespan [Object] The timespan to validate
+      # @param from_date [Object] The from date to validate
+      # @param to_date [Object] The to date to validate
+      # @raise [ArgumentError] if any parameter is invalid
+      def validate_aggregates_parameters(multiplier, timespan, from_date, to_date)
+        raise ArgumentError, "Multiplier must be a positive integer" unless multiplier.instance_of?(Integer) && multiplier > 0
+        raise ArgumentError, "Timespan must be a valid time unit" unless %w[minute hour day week month quarter year].include?(timespan)
+        validate_date_format(from_date, "From date")
+        validate_date_format(to_date, "To date")
+      end
+
+      # Validates date format using explicit pattern matching.
+      # @param date [Object] The date to validate
+      # @param field_name [String] Name of the field for error messages (default: "Date")
+      # @raise [ArgumentError] if date format is invalid
+      def validate_date_format(date, field_name = "Date")
+        raise ArgumentError, "#{field_name} must be in YYYY-MM-DD format" unless date.match?(/^\d{4}-\d{2}-\d{2}$/)
+      end
+
+      # Builds consistent error messages.
+      # @param context [String, nil] Error context or nil
+      # @param url [String] The URL that failed
+      # @return [String] Formatted error message
+      def build_error_message(context, url)
+        return "API request failed for #{url}" unless context
+        "Failed to fetch #{context}"
+      end
+
+      # Load stock data classes from separate files.
+      autoload :Ticker, "polymux/api/stocks/ticker"
+      autoload :TickerDetails, "polymux/api/stocks/ticker_details"
+      autoload :Snapshot, "polymux/api/stocks/snapshot"
+      autoload :Trade, "polymux/api/stocks/trade"
+      autoload :Quote, "polymux/api/stocks/quote"
+      autoload :Aggregate, "polymux/api/stocks/aggregate"
+      autoload :DailySummary, "polymux/api/stocks/daily_summary"
     end
   end
 end

@@ -3,7 +3,9 @@
 require_relative "lib/polymux"
 require "webmock/rspec"
 
-include WebMock::API
+class DebugTest
+  include WebMock::API
+end
 WebMock.enable!
 
 config = Polymux::Config.new(api_key: "test_key_123", base_url: "https://api.polygon.io")

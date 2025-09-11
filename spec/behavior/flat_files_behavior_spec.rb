@@ -6,19 +6,19 @@ require "aws-sdk-s3"
 RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior do
   # Mock AWS S3 client to prevent real API calls
   let(:mock_s3_client) { instance_double(Aws::S3::Client) }
-  
+
   before do
     # Mock S3 client creation
     allow(Aws::S3::Client).to receive(:new).and_return(mock_s3_client)
-    
+
     # Mock file operations to prevent actual file system writes during tests
     allow(FileUtils).to receive(:mkdir_p)
     allow(File).to receive(:exist?).and_return(false)
-    
+
     # Mock File.open to simulate successful writes
     mock_file = StringIO.new
     allow(File).to receive(:open).with(anything, /[wa]b?/).and_yield(mock_file)
-    
+
     # Mock File.size to return expected size after download
     allow(File).to receive(:size) do |path|
       if path.include?("test_download")
@@ -54,20 +54,18 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
         # Mock S3 list_objects_v2 response for file discovery
         mock_list_response = double("Aws::S3::Types::ListObjectsV2Output")
         mock_objects = [
-          double("S3Object", 
+          double("S3Object",
             key: "stocks/trades/2024/01/02/trades.csv.gz",
             size: 2847293847,
             last_modified: Time.parse("2024-01-03T11:00:00.000Z"),
-            etag: '"abc123"'
-          ),
+            etag: '"abc123"'),
           double("S3Object",
-            key: "stocks/trades/2023/12/29/trades.csv.gz", 
+            key: "stocks/trades/2023/12/29/trades.csv.gz",
             size: 2634829173,
             last_modified: Time.parse("2023-12-30T11:00:00.000Z"),
-            etag: '"def456"'
-          )
+            etag: '"def456"')
         ]
-        
+
         allow(mock_list_response).to receive(:contents).and_return(mock_objects)
         allow(mock_s3_client).to receive(:list_objects_v2).and_return(mock_list_response)
 
@@ -85,7 +83,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
           "4,150.30,2024-01-02T09:30:01.234567890Z,200,[14],12346,2024-01-02T09:30:01.234567890Z,2,AAPL,,",
           "4,425.75,2024-01-02T09:30:00.987654321Z,50,[14],12349,2024-01-02T09:30:00.987654321Z,5,TSLA,,"
         ].join("\n")
-        
+
         allow(mock_s3_client).to receive(:get_object) do |args, &block|
           if args[:bucket] == "flatfiles" && args[:key] == "stocks/trades/2024/01/02/trades.csv.gz"
             # Yield chunks to simulate streaming download
@@ -108,7 +106,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
         # Verify file discovery provides historical coverage
         expect(available_files).to be_an(Array)
         expect(available_files.length).to eq(2) # 2 files from mock
-        
+
         # Verify file metadata includes size information for planning
         first_file = available_files.first
         expect(first_file.size).to be > 1_000_000_000 # Large files with substantial data
@@ -125,7 +123,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
 
         # Verify massive efficiency gains over individual API calls
         expect(download_result[:size]).to be > 1000 # Substantial data in single download
-        
+
         # Simulate efficiency comparison
         # Single file download replaces thousands of individual API calls
         estimated_api_calls_replaced = 10000 # Conservative estimate
@@ -182,10 +180,10 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
 
         # Act: User downloads bulk file for comprehensive analysis
         start_time = Time.now
-        
+
         file_info = flat_files_api.get_file_info("us/stocks/trades/2024/03/2024-03-15.csv.gz")
         bulk_data = flat_files_api.download_file("us/stocks/trades/2024/03/2024-03-15.csv.gz")
-        
+
         download_time = Time.now - start_time
 
         # Assert: User achieves dramatic efficiency over REST API approach
@@ -273,7 +271,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
             headers: {"Content-Type" => "text/csv"}
           )
 
-        # Crypto data  
+        # Crypto data
         stub_request(:get, "https://files.polygon.io/flatfiles/us/crypto/trades/2024/03/2024-03-15.csv.gz")
           .to_return(
             status: 200,
@@ -300,7 +298,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
         # Verify timestamp synchronization across asset classes
         all_timestamps = [
           stock_data.trades.map(&:timestamp),
-          options_data.trades.map(&:timestamp), 
+          options_data.trades.map(&:timestamp),
           crypto_data.trades.map(&:timestamp),
           forex_data.trades.map(&:timestamp)
         ].flatten.sort
@@ -308,9 +306,9 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
         # Verify overlapping time coverage for correlation analysis
         trading_session_start = Time.parse("#{trading_date}T09:30:00Z")
         trading_session_end = Time.parse("#{trading_date}T16:00:00Z")
-        
+
         session_timestamps = all_timestamps.select do |ts|
-          ts >= trading_session_start && ts <= trading_session_end
+          ts.between?(trading_session_start, trading_session_end)
         end
         expect(session_timestamps.length).to be > 1000 # Substantial overlap
 
@@ -318,7 +316,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
         stock_tickers = stock_data.trades.map(&:ticker).uniq
         crypto_pairs = crypto_data.trades.map(&:ticker).uniq
         forex_pairs = forex_data.trades.map(&:ticker).uniq
-        
+
         expect(stock_tickers).to include("AAPL", "MSFT", "TSLA", "SPY")
         expect(crypto_pairs).to include("BTC-USD", "ETH-USD")
         expect(forex_pairs).to include("EUR/USD", "GBP/USD")
@@ -394,7 +392,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
         # Filter for specific research needs
         stock_trades_2024 = flat_files_api.list_available_files(
           asset_class: "stocks",
-          data_type: "trades", 
+          data_type: "trades",
           date_range: {start_date: "2024-01-01", end_date: "2024-12-31"}
         )
 
@@ -412,7 +410,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
         # Verify date-based filtering for targeted research
         expect(stock_trades_2024).to be_an(Array)
         expect(stock_trades_2024.length).to be > 200 # Full year of trading days
-        
+
         # Verify all files match requested criteria
         stock_trades_2024.each do |file|
           expect(file.key).to include("stocks/trades/2024")
@@ -490,7 +488,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
         stub_request(:get, "https://files.polygon.io/flatfiles/#{large_file_key}")
           .with(headers: {"Range" => "bytes=#{partial_download_size}-"})
           .to_return(
-            status: 206, # Partial Content  
+            status: 206, # Partial Content
             body: generate_massive_trade_dataset(500_000), # Remaining data
             headers: {
               "Content-Range" => "bytes #{partial_download_size}-#{full_file_size - 1}/#{full_file_size}",
@@ -512,21 +510,20 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
 
         # Simulate interrupted download
         begin
-          flat_files_api.download_file(large_file_key, 
+          flat_files_api.download_file(large_file_key,
             progress_callback: proc { |bytes_downloaded, total_bytes|
               download_progress << {
                 bytes_downloaded: bytes_downloaded,
                 total_bytes: total_bytes,
                 percentage: (bytes_downloaded.to_f / total_bytes * 100).round(2)
               }
-              
-              # Simulate network interruption at 50% progress  
+
+              # Simulate network interruption at 50% progress
               percentage = (bytes_downloaded.to_f / total_bytes * 100).round(2)
               if percentage >= 50.0
                 raise Polymux::Api::FlatFiles::NetworkError, "Connection interrupted"
               end
-            }
-          )
+            })
         rescue Polymux::Api::FlatFiles::NetworkError
           # Expected interruption
         end
@@ -540,8 +537,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
               total_bytes: total_bytes,
               percentage: ((bytes_downloaded + partial_download_size).to_f / total_bytes * 100).round(2)
             }
-          }
-        )
+          })
 
         # Assert: User successfully recovers from network interruptions
 
@@ -575,7 +571,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
         }
 
         expect(reliability_metrics[:interruption_recovery]).to be true
-        expect(reliability_metrics[:data_loss_prevention]).to be true  
+        expect(reliability_metrics[:data_loss_prevention]).to be true
         expect(reliability_metrics[:progress_preservation]).to be true
         expect(reliability_metrics[:bandwidth_efficiency]).to be > 0.4 # 40%+ bandwidth saved
 
@@ -592,7 +588,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
       it "validates data integrity across downloaded files" do
         # Expected Outcome: User verifies downloaded data quality and completeness
         # Success Criteria:
-        #   - Checksum verification ensures file transfer integrity  
+        #   - Checksum verification ensures file transfer integrity
         #   - Data structure validation confirms proper CSV parsing
         #   - Timestamp continuity verification across files
         #   - Missing data identification and reporting
@@ -602,7 +598,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
         # Setup: Prepare for data integrity validation
         config = Polymux::Config.new(
           api_key: "test_key_123",
-          s3_access_key_id: "test_s3_access_key", 
+          s3_access_key_id: "test_s3_access_key",
           s3_secret_access_key: "test_s3_secret_key"
         )
         client = Polymux::Client.new(config)
@@ -678,7 +674,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
 
         # Research reliability validation
         research_confidence = {
-          statistical_significance: quality_metrics[:completeness] == 1.0,
+          statistical_significance: quality_metrics[:completeness] >= 0.999999, # Avoid exact float comparison
           backtesting_reliability: quality_metrics[:accuracy] > 0.99,
           regulatory_compliance: integrity_report.checksum_valid,
           audit_trail: integrity_report.validation_timestamp.is_a?(Time)
@@ -721,27 +717,27 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
           .to_return(
             status: 403,
             body: <<~XML
-              <?xml version="1.0" encoding="UTF-8"?>
-              <Error>
-                <Code>InvalidAccessKeyId</Code>
-                <Message>The AWS Access Key Id you provided does not exist in our records.</Message>
-                <RequestId>1234567890ABCDEF</RequestId>
-              </Error>
-            XML,
-            headers: {"Content-Type" => "application/xml"}
-          )
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <Error>
+                      <Code>InvalidAccessKeyId</Code>
+                      <Message>The AWS Access Key Id you provided does not exist in our records.</Message>
+                      <RequestId>1234567890ABCDEF</RequestId>
+                    </Error>
+                  XML,
+                  headers: {"Content-Type" => "application/xml"}
+                )
 
-        # Mock expired credentials error
-        stub_request(:get, "https://files.polygon.io/flatfiles/us/stocks/trades/")
-          .to_return(
-            status: 403,
-            body: <<~XML
-              <?xml version="1.0" encoding="UTF-8"?>
-              <Error>
-                <Code>TokenRefreshRequired</Code>
-                <Message>The provided token has expired and must be refreshed.</Message>
-                <RequestId>ABCDEF1234567890</RequestId>
-              </Error>
+              # Mock expired credentials error
+              stub_request(:get, "https://files.polygon.io/flatfiles/us/stocks/trades/")
+                .to_return(
+                  status: 403,
+                  body: <<~XML
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <Error>
+                      <Code>TokenRefreshRequired</Code>
+                      <Message>The provided token has expired and must be refreshed.</Message>
+                      <RequestId>ABCDEF1234567890</RequestId>
+                    </Error>
             XML
           )
 
@@ -857,7 +853,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
         # Test availability checking before download attempts
         availability = flat_files_api.check_file_availability(
           asset_class: "stocks",
-          data_type: "trades", 
+          data_type: "trades",
           date: holiday_date
         )
 
@@ -903,7 +899,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
             when 1
               # First attempt - timeout
               {status: 408, body: "Request Timeout"}
-            when 2  
+            when 2
               # Second attempt - server error
               {status: 503, body: "Service Unavailable"}
             when 3
@@ -918,7 +914,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
 
         # Act: User downloads file with automatic retry handling
         start_time = Time.now
-        
+
         download_result = flat_files_api.download_file(file_key,
           retry_options: {
             max_retries: 5,
@@ -926,9 +922,8 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
             retry_callback: proc { |attempt, error, wait_time|
               # User visibility into retry process
             }
-          }
-        )
-        
+          })
+
         total_time = Time.now - start_time
 
         # Assert: User successfully downloads despite transient failures
@@ -936,16 +931,16 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
         # Verify retry attempts were made
         actual_retry_attempts = Polymux::Api::FlatFiles::Client.retry_attempts
         actual_call_count = Polymux::Api::FlatFiles::Client.call_count
-        
+
         expect(actual_retry_attempts.length).to eq(3) # 2 failures + 1 success
         expect(actual_call_count).to eq(3)
 
         # Verify exponential backoff timing
         if actual_retry_attempts.length > 1
           time_gaps = actual_retry_attempts.each_cons(2).map do |prev, curr|
-            curr[:timestamp] - prev[:timestamp]  
+            curr[:timestamp] - prev[:timestamp]
           end
-          
+
           # Second attempt should wait longer than first attempt would have
           expect(time_gaps.first).to be_between(1.0, 3.0) # ~2 second initial backoff
           if time_gaps.length > 1
@@ -967,7 +962,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
           failure_recovery: true,
           data_integrity_maintained: download_result.trades.length > 0,
           user_intervention_avoided: actual_retry_attempts.length > 1,
-          final_success_rate: actual_call_count > 0 ? 1.0 : 0.0
+          final_success_rate: (actual_call_count > 0) ? 1.0 : 0.0
         }
 
         expect(reliability_stats[:failure_recovery]).to be true
@@ -997,7 +992,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
       price = rand(50.0..500.0).round(2)
       size = [100, 200, 500, 1000].sample
       timestamp = Time.now - rand(86400) # Random time within last 24 hours
-      "4,#{price},#{timestamp.strftime('%Y-%m-%dT%H:%M:%S.%9NZ')},#{size},[14],#{i},#{timestamp.strftime('%Y-%m-%dT%H:%M:%S.%9NZ')},#{i},#{ticker},,"
+      "4,#{price},#{timestamp.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")},#{size},[14],#{i},#{timestamp.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")},#{i},#{ticker},,"
     end
     header + trades.join("\n")
   end
@@ -1009,7 +1004,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
       timestamp = base_time + (i * 60) # One trade per minute
       ticker = ["AAPL", "MSFT", "SPY", "QQQ"][i % 4]
       price = 150.0 + (i * 0.1)
-      "4,#{price},#{timestamp.strftime('%Y-%m-%dT%H:%M:%S.%9NZ')},100,[14],#{i},#{timestamp.strftime('%Y-%m-%dT%H:%M:%S.%9NZ')},#{i},#{ticker},,"
+      "4,#{price},#{timestamp.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")},100,[14],#{i},#{timestamp.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")},#{i},#{ticker},,"
     end
     header + trades.join("\n")
   end
@@ -1020,7 +1015,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
     trades = (0..50).map do |i|
       timestamp = base_time + (i * 120) # One trade every 2 minutes
       price = 5.0 + (i * 0.05)
-      "4,#{price},#{timestamp.strftime('%Y-%m-%dT%H:%M:%S.%9NZ')},10,[14],#{i},#{timestamp.strftime('%Y-%m-%dT%H:%M:%S.%9NZ')},#{i},O:AAPL240315C00150000,,"
+      "4,#{price},#{timestamp.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")},10,[14],#{i},#{timestamp.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")},#{i},O:AAPL240315C00150000,,"
     end
     header + trades.join("\n")
   end
@@ -1031,8 +1026,8 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
     trades = (0..200).map do |i|
       timestamp = base_time + (i * 43200) # Every 12 hours
       ticker = ["BTC-USD", "ETH-USD"][i % 2]
-      price = ticker == "BTC-USD" ? 45000 + (i * 10) : 2500 + (i * 5)
-      "1,#{price},#{timestamp.strftime('%Y-%m-%dT%H:%M:%S.%9NZ')},0.1,[],#{i},#{timestamp.strftime('%Y-%m-%dT%H:%M:%S.%9NZ')},#{i},#{ticker},,"
+      price = (ticker == "BTC-USD") ? 45000 + (i * 10) : 2500 + (i * 5)
+      "1,#{price},#{timestamp.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")},0.1,[],#{i},#{timestamp.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")},#{i},#{ticker},,"
     end
     header + trades.join("\n")
   end
@@ -1045,10 +1040,10 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
       ticker = ["EUR/USD", "GBP/USD", "USD/JPY"][i % 3]
       price = case ticker
       when "EUR/USD" then 1.0850 + (i * 0.0001)
-      when "GBP/USD" then 1.2750 + (i * 0.0001) 
+      when "GBP/USD" then 1.2750 + (i * 0.0001)
       when "USD/JPY" then 148.50 + (i * 0.01)
       end
-      "1,#{price},#{timestamp.strftime('%Y-%m-%dT%H:%M:%S.%9NZ')},100000,[],#{i},#{timestamp.strftime('%Y-%m-%dT%H:%M:%S.%9NZ')},#{i},#{ticker},,"
+      "1,#{price},#{timestamp.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")},100000,[],#{i},#{timestamp.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")},#{i},#{ticker},,"
     end
     header + trades.join("\n")
   end
@@ -1102,7 +1097,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
       size = rand(50_000_000..150_000_000)
       date_str = date.strftime("%Y-%m-%d")
       month_str = date.strftime("%m")
-      
+
       <<~ENTRY
         <Contents>
           <Key>us/#{asset_class}/#{data_type}/#{year}/#{month_str}/#{date_str}.csv.gz</Key>
@@ -1116,7 +1111,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
   def generate_trading_days(year)
     start_date = Date.new(year, 1, 1)
     end_date = Date.new(year, 12, 31)
-    
+
     (start_date..end_date).select do |date|
       # Exclude weekends and major holidays
       date.wday.between?(1, 5) && !holiday?(date)
@@ -1127,8 +1122,8 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
     # Simplified holiday check for major US market holidays
     holidays = [
       Date.new(date.year, 1, 1),   # New Year's Day
-      Date.new(date.year, 7, 4),   # Independence Day  
-      Date.new(date.year, 12, 25), # Christmas
+      Date.new(date.year, 7, 4),   # Independence Day
+      Date.new(date.year, 12, 25) # Christmas
     ]
     holidays.include?(date)
   end
@@ -1140,7 +1135,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
       price = (100.0 + (i * 0.01)).round(2)
       size = 100
       timestamp = Time.parse("2024-03-15T09:30:00Z") + (i * 0.1)
-      "4,#{price},#{timestamp.strftime('%Y-%m-%dT%H:%M:%S.%9NZ')},#{size},[14],#{i},#{timestamp.strftime('%Y-%m-%dT%H:%M:%S.%9NZ')},#{i},#{ticker},,"
+      "4,#{price},#{timestamp.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")},#{size},[14],#{i},#{timestamp.strftime("%Y-%m-%dT%H:%M:%S.%9NZ")},#{i},#{ticker},,"
     end
     header + trades.join("\n")
   end
@@ -1148,21 +1143,21 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
   def generate_available_dates_listing(month, exclude_holidays: false)
     year, month_num = month.split("-").map(&:to_i)
     days_in_month = Date.new(year, month_num, -1).day
-    
+
     available_days = (1..days_in_month).map do |day|
       date = Date.new(year, month_num, day)
       next if exclude_holidays && (date.wday == 0 || date.wday == 6 || holiday?(date))
-      
+
       date_str = date.strftime("%Y-%m-%d")
       <<~ENTRY
         <Contents>
-          <Key>us/stocks/trades/#{year}/#{month_num.to_s.rjust(2, '0')}/#{date_str}.csv.gz</Key>
+          <Key>us/stocks/trades/#{year}/#{month_num.to_s.rjust(2, "0")}/#{date_str}.csv.gz</Key>
           <Size>#{rand(50_000_000..100_000_000)}</Size>
           <LastModified>#{(date + 1).strftime("%Y-%m-%dT11:00:00.000Z")}</LastModified>
         </Contents>
       ENTRY
     end.compact.join
-    
+
     <<~XML
       <?xml version="1.0" encoding="UTF-8"?>
       <ListBucketResult>
@@ -1176,7 +1171,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
   def generate_valid_trade_data(trade_count)
     header = "exchange,price,sip_timestamp,size,conditions,id,participant_timestamp,sequence_number,ticker,trf_id,trf_timestamp\n"
     trades = (1..trade_count).map do |i|
-      "4,#{(150.0 + i * 0.01).round(2)},#{(Time.now + i).strftime('%Y-%m-%dT%H:%M:%S.%9NZ')},100,[14],#{i},#{(Time.now + i).strftime('%Y-%m-%dT%H:%M:%S.%9NZ')},#{i},AAPL,,"
+      "4,#{(150.0 + i * 0.01).round(2)},#{(Time.now + i).strftime("%Y-%m-%dT%H:%M:%S.%9NZ")},100,[14],#{i},#{(Time.now + i).strftime("%Y-%m-%dT%H:%M:%S.%9NZ")},#{i},AAPL,,"
     end
     header + trades.join("\n")
   end
@@ -1184,13 +1179,13 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
   def calculate_time_overlap(dataset1, dataset2)
     times1 = dataset1.map(&:timestamp).sort
     times2 = dataset2.map(&:timestamp).sort
-    
+
     overlap_start = [times1.first, times2.first].max
     overlap_end = [times1.last, times2.last].min
-    
+
     {
-      overlap_minutes: overlap_end > overlap_start ? ((overlap_end - overlap_start) / 60).to_i : 0,
-      coverage_percentage: overlap_end > overlap_start ? 
+      overlap_minutes: (overlap_end > overlap_start) ? ((overlap_end - overlap_start) / 60).to_i : 0,
+      coverage_percentage: (overlap_end > overlap_start) ?
         ((overlap_end - overlap_start) / (times1.last - times1.first) * 100).round(2) : 0
     }
   end
@@ -1202,7 +1197,7 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
         (opt_trade.timestamp - stock_trade.timestamp).abs < 60
       end
     end
-    
+
     {aligned_trades: aligned, alignment_percentage: (aligned.to_f / options_trades.length * 100).round(2)}
   end
 
@@ -1210,30 +1205,26 @@ RSpec.describe "Bulk Historical Data Analysis via Flat Files", type: :behavior d
     # Simplified inverse correlation detection
     stock_price_changes = stock_trades.each_cons(2).map { |prev, curr| curr.price - prev.price }
     forex_price_changes = forex_trades.each_cons(2).map { |prev, curr| curr.price - prev.price }
-    
-    inverse_moves = stock_price_changes.zip(forex_price_changes).count do |stock_change, forex_change|
+
+    stock_price_changes.zip(forex_price_changes).count do |stock_change, forex_change|
       (stock_change > 0 && forex_change < 0) || (stock_change < 0 && forex_change > 0)
     end
-    
-    inverse_moves
   end
 
   def identify_independent_movements(stock_trades, crypto_trades)
     # Count periods where crypto moves independently of stocks
     stock_volatility = stock_trades.map(&:price).each_cons(2).map { |prev, curr| (curr - prev).abs }
     crypto_volatility = crypto_trades.map(&:price).each_cons(2).map { |prev, curr| (curr - prev).abs }
-    
-    independent_periods = stock_volatility.zip(crypto_volatility).count do |stock_vol, crypto_vol|
-      stock_vol < (stock_volatility.sum / stock_volatility.length) && 
-      crypto_vol > (crypto_volatility.sum / crypto_volatility.length)
+
+    stock_volatility.zip(crypto_volatility).count do |stock_vol, crypto_vol|
+      stock_vol < (stock_volatility.sum / stock_volatility.length) &&
+        crypto_vol > (crypto_volatility.sum / crypto_volatility.length)
     end
-    
-    independent_periods
   end
 
   def measure_hedge_relationships(stock_trades, options_trades)
     # Simplified hedge relationship measurement
-    return 0.7 # 70% correlation for demonstration
+    0.7 # 70% correlation for demonstration
   end
 
   def calculate_download_time(total_bytes, bandwidth_mbps = 100)

@@ -31,24 +31,24 @@ module Polymux
         transform_keys(&:to_sym)
 
         # Price at which the option position breaks even at expiration
-        # @return [Float] Break-even price for the option holder
-        attribute :break_even_price, Types::Float
+        # @return [Float, nil] Break-even price for the option holder (nil if not available)
+        attribute? :break_even_price, Types::Float.optional
 
         # Daily price and volume summary
         # @return [DailyBar, nil] OHLC and volume data for current trading day
-        attribute? :daily_bar, DailyBar
+        attribute? :daily_bar, DailyBar.optional
 
         # Current implied volatility of the option
         # @return [Float, nil] Implied volatility as decimal (0.25 = 25%)
-        attribute? :implied_volatility, Types::Float
+        attribute? :implied_volatility, Types::Float.optional
 
         # Most recent bid/ask quote
         # @return [LastQuote, nil] Current market quote data
-        attribute? :last_quote, LastQuote
+        attribute? :last_quote, LastQuote.optional
 
         # Most recent trade execution
         # @return [LastTrade, nil] Last trade price and size
-        attribute? :last_trade, LastTrade
+        attribute? :last_trade, LastTrade.optional
 
         # Number of outstanding contracts
         # @return [Integer] Open interest (total contracts not yet closed)
@@ -60,7 +60,7 @@ module Polymux
 
         # Option Greeks for risk analysis
         # @return [Greeks, nil] Delta, gamma, theta, vega values
-        attribute? :greeks, Greeks
+        attribute? :greeks, Greeks.optional
 
         # Check if the option has recent trading activity.
         # @return [Boolean] true if last_trade data is present

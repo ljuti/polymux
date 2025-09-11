@@ -231,7 +231,7 @@ RSpec.describe "Technical Analysis for Trading Strategies", type: :behavior do
 
         # Verify RSI values are within valid range (0-100)
         rsi_values = rsi_data.values.map(&:value)
-        expect(rsi_values.all? { |v| v >= 0 && v <= 100 }).to be true
+        expect(rsi_values.all? { |v| v.between?(0, 100) }).to be true
 
         # Verify overbought/oversold level identification
         overbought_threshold = 70

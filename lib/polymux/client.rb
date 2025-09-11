@@ -196,7 +196,7 @@ module Polymux
     #
     #   # Download synchronized data across asset classes
     #   stocks_files = flat_files.list_files("stocks", "trades", date)
-    #   options_files = flat_files.list_files("options", "trades", date) 
+    #   options_files = flat_files.list_files("options", "trades", date)
     #   crypto_files = flat_files.list_files("crypto", "trades", date)
     #
     #   # Bulk download all asset classes for correlation analysis
@@ -234,7 +234,7 @@ module Polymux
     def build_http_client
       Faraday.new(url: @_config.base_url) do |faraday|
         configure_json_handling(faraday)
-        configure_adapter(faraday)  
+        configure_adapter(faraday)
         configure_authorization(faraday)
       end
     end

@@ -41,15 +41,34 @@ RSpec.describe Polymux::Api::Options::Contract do
 
   describe "required attributes" do
     it "requires all contract attributes to be present" do
-      expect(contract.cfi).to be_a(String)
-      expect(contract.contract_type).to be_a(String)
-      expect(contract.exercise_style).to be_a(String)
-      expect(contract.expiration_date).to be_a(String)
-      expect(contract.primary_exchange).to be_a(String)
-      expect(contract.shares_per_contract).to be_an(Integer)
+      expect(contract.cfi).to be_instance_of(String)
+      expect(contract.contract_type).to be_instance_of(String)
+      expect(contract.exercise_style).to be_instance_of(String)
+      expect(contract.expiration_date).to be_instance_of(String)
+      expect(contract.primary_exchange).to be_instance_of(String)
+      expect(contract.shares_per_contract).to be_instance_of(Integer)
       expect(contract.strike_price).to be_a(Numeric)
-      expect(contract.ticker).to be_a(String)
-      expect(contract.underlying_ticker).to be_a(String)
+      expect(contract.ticker).to be_instance_of(String)
+      expect(contract.underlying_ticker).to be_instance_of(String)
+    end
+
+    it "enforces required attributes during initialization" do
+      expect {
+        described_class.new({})
+      }.to raise_error(Dry::Struct::Error)
+    end
+
+    required_attributes = %i[cfi contract_type exercise_style expiration_date primary_exchange
+      shares_per_contract strike_price ticker underlying_ticker]
+
+    required_attributes.each do |attr|
+      it "requires #{attr} to be present" do
+        incomplete_data = contract_data.except(attr)
+
+        expect {
+          described_class.new(incomplete_data)
+        }.to raise_error(Dry::Struct::Error, /#{attr}|missing/)
+      end
     end
   end
 
@@ -69,6 +88,28 @@ RSpec.describe Polymux::Api::Options::Contract do
         expect(put_contract.call?).to be false
       end
     end
+
+    context "with edge case strings" do
+      it "returns false for CALL (uppercase)" do
+        uppercase_contract = described_class.new(contract_data.merge(contract_type: "CALL"))
+        expect(uppercase_contract.call?).to be false
+      end
+
+      it "returns false for empty string" do
+        empty_contract = described_class.new(contract_data.merge(contract_type: ""))
+        expect(empty_contract.call?).to be false
+      end
+
+      it "returns false for whitespace-padded call" do
+        padded_contract = described_class.new(contract_data.merge(contract_type: " call "))
+        expect(padded_contract.call?).to be false
+      end
+
+      it "returns false for partial match" do
+        partial_contract = described_class.new(contract_data.merge(contract_type: "cal"))
+        expect(partial_contract.call?).to be false
+      end
+    end
   end
 
   describe "#put?" do
@@ -85,6 +126,28 @@ RSpec.describe Polymux::Api::Options::Contract do
 
       it "returns false" do
         expect(call_contract.put?).to be false
+      end
+    end
+
+    context "with edge case strings" do
+      it "returns false for PUT (uppercase)" do
+        uppercase_contract = described_class.new(contract_data.merge(contract_type: "PUT"))
+        expect(uppercase_contract.put?).to be false
+      end
+
+      it "returns false for empty string" do
+        empty_contract = described_class.new(contract_data.merge(contract_type: ""))
+        expect(empty_contract.put?).to be false
+      end
+
+      it "returns false for whitespace-padded put" do
+        padded_contract = described_class.new(contract_data.merge(contract_type: " put "))
+        expect(padded_contract.put?).to be false
+      end
+
+      it "returns false for partial match" do
+        partial_contract = described_class.new(contract_data.merge(contract_type: "pu"))
+        expect(partial_contract.put?).to be false
       end
     end
   end
@@ -157,6 +220,48 @@ RSpec.describe Polymux::Api::Options::Contract do
 
       it "handles integer strike prices correctly" do
         expect(integer_strike_contract.notional_value).to eq(15000) # 150 * 100
+      end
+    end
+
+    context "boundary value testing" do
+      it "calculates correctly with zero strike price" do
+        zero_strike = described_class.new(contract_data.merge(strike_price: 0))
+        expect(zero_strike.notional_value).to eq(0)
+      end
+
+      it "calculates correctly with zero multiplier" do
+        zero_multiplier = described_class.new(contract_data.merge(shares_per_contract: 0))
+        expect(zero_multiplier.notional_value).to eq(0)
+      end
+
+      it "calculates correctly with very small strike price" do
+        tiny_strike = described_class.new(contract_data.merge(strike_price: 0.01))
+        expect(tiny_strike.notional_value).to eq(1.0) # 0.01 * 100
+      end
+
+      it "calculates correctly with very large strike price" do
+        huge_strike = described_class.new(contract_data.merge(strike_price: 999999.99))
+        expect(huge_strike.notional_value).to eq(99999999.0)
+      end
+
+      it "calculates correctly with negative strike price" do
+        negative_strike = described_class.new(contract_data.merge(strike_price: -10.5))
+        expect(negative_strike.notional_value).to eq(-1050.0)
+      end
+
+      it "preserves precision with fractional calculations" do
+        fractional = described_class.new(contract_data.merge(strike_price: 123.456, shares_per_contract: 100))
+        expect(fractional.notional_value).to eq(12345.6)
+      end
+
+      it "handles unusual contract multipliers" do
+        unusual = described_class.new(contract_data.merge(strike_price: 50.0, shares_per_contract: 1000))
+        expect(unusual.notional_value).to eq(50000.0)
+      end
+
+      it "performs multiplication correctly (not addition or other operations)" do
+        test_contract = described_class.new(contract_data.merge(strike_price: 7, shares_per_contract: 11))
+        expect(test_contract.notional_value).to eq(77) # Specifically 7 * 11, not 7 + 11 (18)
       end
     end
   end
