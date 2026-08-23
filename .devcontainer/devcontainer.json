@@ -7,6 +7,12 @@
   "features": {
     "ghcr.io/devcontainers/features/git:1": {}
   },
+  "containerEnv": {
+    "POLYMUX_API_KEY": "${localEnv:POLYMUX_API_KEY}",
+    "POLYMUX_BASE_URL": "${localEnv:POLYMUX_BASE_URL}",
+    "POLYMUX_S3_ACCESS_KEY_ID": "${localEnv:POLYMUX_S3_ACCESS_KEY_ID}",
+    "POLYMUX_S3_SECRET_ACCESS_KEY": "${localEnv:POLYMUX_S3_SECRET_ACCESS_KEY}"
+  },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "postStartCommand": "bash .devcontainer/post-start.sh",
   "customizations": {

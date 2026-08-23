@@ -5,6 +5,7 @@ RUN apt-get update -qq && \
       build-essential \
       git \
       libssl-dev \
+      libyaml-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace

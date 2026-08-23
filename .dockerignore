@@ -8,3 +8,5 @@ spec/reports
 .rspec_status
 .devcontainer
 .github
+.env
+.env.local

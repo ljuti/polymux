@@ -42,6 +42,8 @@ Uses `anyway_config` for flexible configuration management:
 - Config file: `config/polymux.local.yml`
 - Environment variables with `POLYMUX_` prefix
 - Required: `api_key`, `base_url`
+- In the devcontainer, secrets load from `.env` on boot (see `.env.example`)
+  or are injected via `containerEnv` from host env
 
 ### Standards
 
