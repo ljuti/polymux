@@ -1,13 +1,41 @@
+# Bundler
 /.bundle/
+/vendor/bundle/
+Gemfile.lock
+
+# Documentation
 /.yardoc
 /_yardoc/
-/coverage/
 /doc/
+
+# Build artifacts
 /pkg/
-/spec/reports/
 /tmp/
 
-# rspec failure tracking
+# Coverage
+/coverage/
+
+# Test artifacts
+/spec/reports/
 .rspec_status
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# AI assistant artifacts
+.claude/
+.opencode/
+
+# Project-specific
 /config/*.local.yml
-.claude

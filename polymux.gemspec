@@ -12,8 +12,10 @@ Gem::Specification.new do |spec|
   spec.description = "Ruby client for Polygon.io API"
   spec.homepage = "https://github.com/ljuti/polymux"
   spec.license = "MIT"
-  spec.required_ruby_version = ">= 3.1.0"
+  spec.required_ruby_version = ">= 3.2.0"
 
+  spec.metadata["allowed_push_host"] = "https://rubygems.org"
+  spec.metadata["rubygems_mfa_required"] = "true"
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = spec.homepage
   spec.metadata["changelog_uri"] = "https://github.com/ljuti/polymux/blob/main/CHANGELOG.md"
@@ -31,9 +33,8 @@ Gem::Specification.new do |spec|
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
-  # Uncomment to register a new dependency of your gem
-  # spec.add_dependency "example-gem", "~> 1.0"
   spec.add_dependency "activesupport"
+  spec.add_dependency "ostruct"
   spec.add_dependency "anyway_config", "~> 2.0"
   spec.add_dependency "faraday", "~> 2.0"
   spec.add_dependency "dry-struct"

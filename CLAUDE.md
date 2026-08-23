@@ -45,7 +45,7 @@ Uses `anyway_config` for flexible configuration management:
 
 ### Standards
 
-- Ruby 3.1+ required
+- Ruby 3.2+ required
 - Uses StandardRB for linting and formatting
 - RSpec for testing
 - Dependencies: Faraday (HTTP), ActiveSupport, dry-struct, dry-transformer

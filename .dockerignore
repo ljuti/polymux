@@ -1,0 +1,10 @@
+.git
+.bundle
+vendor
+coverage
+tmp
+pkg
+spec/reports
+.rspec_status
+.devcontainer
+.github
