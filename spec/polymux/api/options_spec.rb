@@ -100,10 +100,9 @@ RSpec.describe Polymux::Api::Options do
             )
         end
 
-        it "raises NoMethodError when results is null (actual behavior)" do
-          expect {
-            options_api.contracts
-          }.to raise_error(NoMethodError, /undefined method `map' for nil:NilClass/)
+        it "returns empty array when results is null" do
+          contracts = options_api.contracts
+          expect(contracts).to eq([])
         end
       end
     end
@@ -134,6 +133,46 @@ RSpec.describe Polymux::Api::Options do
 
         expect(contracts).to all(be_instance_of(Polymux::Api::Options::Contract))
         expect(contracts.map(&:underlying_ticker)).to all(eq("AAPL"))
+      end
+    end
+
+    context "parameter type checking (mutation-resistant)" do
+  end
+
+    context "when response includes next_url" do
+      before do
+        stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {underlying_ticker: "AEM"})
+          .to_return(
+            status: 200,
+            body: '{"results": [{"cfi": "OCASPS", "contract_type": "call", "exercise_style": "american", "expiration_date": "2028-01-21", "primary_exchange": "CBOE", "shares_per_contract": 100, "strike_price": 220.0, "ticker": "O:AEM280121C00220000", "underlying_ticker": "AEM"}], "next_url": "https://api.polygon.io/v3/reference/options/contracts?cursor=abc", "status": "OK"}',
+            headers: {"Content-Type" => "application/json"}
+          )
+        stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts?cursor=abc")
+          .with(headers: {"Authorization" => "Bearer test_key_123"})
+          .to_return(
+            status: 200,
+            body: '{"results": [{"cfi": "OPASPS", "contract_type": "put", "exercise_style": "american", "expiration_date": "2028-01-21", "primary_exchange": "CBOE", "shares_per_contract": 100, "strike_price": 215.0, "ticker": "O:AEM280121P00215000", "underlying_ticker": "AEM"}], "next_url": null, "status": "OK"}',
+            headers: {"Content-Type" => "application/json"}
+          )
+      end
+
+      it "follows next_url and returns contracts from all pages" do
+        contracts = options_api.contracts("AEM")
+
+        expect(contracts.length).to eq(2)
+        expect(contracts.map(&:ticker)).to eq(["O:AEM280121C00220000", "O:AEM280121P00215000"])
+        expect(a_request(:get, "https://api.polygon.io/v3/reference/options/contracts?cursor=abc"))
+          .to have_been_made.once
+      end
+
+      it "makes one request per page" do
+        options_api.contracts("AEM")
+
+        expect(a_request(:get, "https://api.polygon.io/v3/reference/options/contracts")
+          .with(query: {underlying_ticker: "AEM"})).to have_been_made.once
+        expect(a_request(:get, "https://api.polygon.io/v3/reference/options/contracts?cursor=abc"))
+          .to have_been_made.once
       end
     end
 
@@ -285,6 +324,91 @@ RSpec.describe Polymux::Api::Options do
       expect(options_api).to receive(:contracts).with("TSLA", {limit: 100})
 
       options_api.for_ticker("TSLA", limit: 100)
+    end
+  end
+
+  describe "#snapshot" do
+  end
+
+  describe "#contract" do
+    let(:single_contract_body) do
+      '{"results": {"cfi": "OCASPS", "contract_type": "call", "exercise_style": "american", "expiration_date": "2028-01-21", "primary_exchange": "CBOE", "shares_per_contract": 100, "strike_price": 220.0, "ticker": "O:AEM280121C00220000", "underlying_ticker": "AEM"}, "status": "OK"}'
+    end
+
+    context "with an OCC ticker string" do
+      before do
+        stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts/O:AEM280121C00220000")
+          .with(headers: {"Authorization" => "Bearer test_key_123"})
+          .to_return(status: 200, body: single_contract_body, headers: {"Content-Type" => "application/json"})
+      end
+
+      it "makes GET request to the OCC ticker path form" do
+        options_api.contract("O:AEM280121C00220000")
+
+        expect(a_request(:get, "https://api.polygon.io/v3/reference/options/contracts/O:AEM280121C00220000"))
+          .to have_been_made.once
+      end
+
+      it "returns the matching Contract object" do
+        contract = options_api.contract("O:AEM280121C00220000")
+
+        expect(contract).to be_a(Polymux::Api::Options::Contract)
+        expect(contract.ticker).to eq("O:AEM280121C00220000")
+        expect(contract.underlying_ticker).to eq("AEM")
+        expect(contract.expiration_date).to eq("2028-01-21")
+        expect(contract.strike_price).to eq(220.0)
+      end
+    end
+
+    context "with a Contract object" do
+      let(:contract) do
+        Polymux::Api::Options::Contract.new(
+          cfi: "OCASPS",
+          contract_type: "call",
+          exercise_style: "american",
+          expiration_date: "2024-03-15",
+          primary_exchange: "CBOE",
+          shares_per_contract: 100,
+          strike_price: 150.0,
+          ticker: "O:AAPL240315C00150000",
+          underlying_ticker: "AAPL"
+        )
+      end
+
+      before do
+        stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts/O:AAPL240315C00150000")
+          .with(headers: {"Authorization" => "Bearer test_key_123"})
+          .to_return(status: 200, body: single_contract_body, headers: {"Content-Type" => "application/json"})
+      end
+
+      it "extracts the ticker from the Contract object" do
+        options_api.contract(contract)
+
+        expect(a_request(:get, "https://api.polygon.io/v3/reference/options/contracts/O:AAPL240315C00150000"))
+          .to have_been_made.once
+      end
+    end
+
+    context "with invalid ticker argument" do
+      it "raises ArgumentError for invalid type" do
+        expect {
+          options_api.contract(123)
+        }.to raise_error(ArgumentError, "Contract must be a ticker or a Contract object")
+      end
+    end
+
+    context "when API request fails" do
+      before do
+        stub_request(:get, "https://api.polygon.io/v3/reference/options/contracts/INVALID")
+          .with(headers: {"Authorization" => "Bearer test_key_123"})
+          .to_return(status: 404)
+      end
+
+      it "raises Polymux::Api::Error on failed request" do
+        expect {
+          options_api.contract("INVALID")
+        }.to raise_error(Polymux::Api::Error, "Failed to fetch contract INVALID")
+      end
     end
   end
 

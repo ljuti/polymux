@@ -17,9 +17,9 @@ module Polymux
       #   puts "Data type: #{underlying.realtime? ? 'Real-time' : 'Delayed'}"
       #   puts "Last updated: #{underlying.timestamp}"
       #
-      #   if underlying.change_to_break_even > 0
+      #   if underlying.needs_to_rise?
       #     puts "Underlying needs to move up $#{underlying.change_to_break_even} to break even"
-      #   else
+      #   elsif underlying.needs_to_fall?
       #     puts "Underlying needs to move down $#{underlying.change_to_break_even.abs} to break even"
       #   end
       class UnderlyingAsset < Dry::Struct
@@ -46,8 +46,8 @@ module Polymux
         attribute? :timeframe, Types::String | Types::Nil
 
         # Dollar amount underlying needs to move to reach option break-even
-        # @return [Integer, Float] Positive = needs to go up, negative = needs to go down
-        attribute :change_to_break_even, Types::PolymuxNumber
+        # @return [Integer, Float, nil] Positive = needs to go up, negative = needs to go down (nil when the API omits it)
+        attribute? :change_to_break_even, Types::PolymuxNumber | Types::Nil
 
         # Convert nanosecond timestamp to DateTime object.
         # @return [DateTime, nil] Converted timestamp for easy manipulation
@@ -68,27 +68,27 @@ module Polymux
         end
 
         # Check if underlying needs to move up to reach break-even.
-        # @return [Boolean] true if change_to_break_even is positive
+        # @return [Boolean] true if change_to_break_even is positive (false when absent)
         def needs_to_rise?
-          change_to_break_even > 0
+          !change_to_break_even.nil? && change_to_break_even > 0
         end
 
         # Check if underlying needs to move down to reach break-even.
-        # @return [Boolean] true if change_to_break_even is negative
+        # @return [Boolean] true if change_to_break_even is negative (false when absent)
         def needs_to_fall?
-          change_to_break_even < 0
+          !change_to_break_even.nil? && change_to_break_even < 0
         end
 
         # Get the absolute distance to break-even.
-        # @return [Float] Absolute dollar amount to break-even
+        # @return [Float, nil] Absolute dollar amount to break-even (nil when absent)
         def distance_to_break_even
-          change_to_break_even.abs
+          change_to_break_even&.abs
         end
 
         # Calculate percentage move needed to reach break-even.
-        # @return [Float, nil] Percentage move required (nil if no price data)
+        # @return [Float, nil] Percentage move required (nil if no price or break-even data)
         def break_even_move_percentage
-          return nil unless price && !price.zero?
+          return nil unless price && change_to_break_even && !price.zero?
           ((change_to_break_even / price) * 100).round(4)
         end
 

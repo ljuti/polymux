@@ -115,6 +115,56 @@ RSpec.describe Polymux::Api::Options::Snapshot do
   end
 
   describe "#actively_traded?" do
+  end
+
+  describe "live API wire format" do
+    let(:live_body) do
+      {
+        "break_even_price" => 152.45,
+        "implied_volatility" => 0.28,
+        "last_quote" => {
+          "ask" => 0.35,
+          "ask_size" => 338,
+          "ask_exchange" => 304,
+          "bid" => 0.05,
+          "bid_size" => 47,
+          "bid_exchange" => 320,
+          "last_updated" => 1787342365646547606,
+          "midpoint" => 0.2,
+          "timeframe" => "REAL-TIME"
+        },
+        "underlying_asset" => {
+          "ticker" => "AEM",
+          "price" => 18.5
+        }
+      }
+    end
+
+    it "parses a live snapshot that omits open_interest and change_to_break_even" do
+      snapshot = described_class.from_api(live_body)
+
+      expect(snapshot).to be_instance_of(described_class)
+      expect(snapshot.open_interest).to be_nil
+      expect(snapshot.underlying_asset.change_to_break_even).to be_nil
+      expect(snapshot.last_quote.ask).to eq(0.35)
+      expect(snapshot.last_quote.bid).to eq(0.05)
+      expect(snapshot.last_quote.ask_exchange).to eq(304)
+      expect(snapshot.last_quote.midpoint).to eq(0.2)
+    end
+  end
+
+  describe "open_interest optional" do
+    it "creates a snapshot with nil open_interest when omitted" do
+      snapshot = described_class.new(
+        break_even_price: 150.0,
+        underlying_asset: underlying_asset_data
+      )
+
+      expect(snapshot.open_interest).to be_nil
+    end
+  end
+
+  describe "#actively_traded?" do
     context "when last_trade data is present" do
       it "returns true" do
         expect(snapshot.actively_traded?).to be true

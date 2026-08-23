@@ -386,6 +386,33 @@ RSpec.describe Polymux::Api::Options::UnderlyingAsset do
   end
 
   describe "comprehensive direction testing" do
+  end
+
+  describe "when change_to_break_even is omitted" do
+    let(:asset_without_change) { described_class.new(ticker: "AAPL") }
+
+    it "stores nil for change_to_break_even" do
+      expect(asset_without_change.change_to_break_even).to be_nil
+    end
+
+    it "returns false from needs_to_rise?" do
+      expect(asset_without_change.needs_to_rise?).to be false
+    end
+
+    it "returns false from needs_to_fall?" do
+      expect(asset_without_change.needs_to_fall?).to be false
+    end
+
+    it "returns nil from distance_to_break_even" do
+      expect(asset_without_change.distance_to_break_even).to be_nil
+    end
+
+    it "returns nil from break_even_move_percentage" do
+      expect(asset_without_change.break_even_move_percentage).to be_nil
+    end
+  end
+
+  describe "comprehensive direction testing" do
     let(:test_scenarios) do
       [
         {

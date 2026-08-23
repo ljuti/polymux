@@ -55,6 +55,12 @@
 - Complete integration with existing options and market data APIs
 - Consistent data transformation patterns across all endpoints
 
+### Fixed
+- **Options snapshot parsing against the live API**: `LastQuote` now reads the wire field names (`ask`, `bid`, `ask_size`, `bid_size`, `ask_exchange`, `bid_exchange`, `midpoint`, `last_updated`, `timeframe`); `ask_price`/`bid_price` remain as backwards-compatible aliases and legacy input keys are still accepted.
+- **Options snapshot optional fields**: `open_interest` and `underlying_asset.change_to_break_even` are now optional (matching the API contract), so real snapshots that omit them no longer raise `Dry::Struct::Error`.
+- **Options `contracts()` pagination**: collection fetches now follow the API's `next_url` cursor until exhausted, so `contracts("AEM")` returns the full chain instead of only the first page (default `limit` 10).
+- **Single contract resolution**: new `Options#contract(ticker)` resolves one contract via the OCC-ticker path form `GET /v3/reference/options/contracts/{options_ticker}`.
+
 ## [0.1.0] - 2025-06-24
 
 - Initial release with complete options trading functionality

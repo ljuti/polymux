@@ -171,6 +171,9 @@ end
 chain = options.chain("AAPL")
 active_options = chain.select { |snap| snap.last_trade }
 puts "Active contracts in chain: #{active_options.length}"
+# Resolve a single contract directly by OCC ticker (reaches far-dated expirations)
+far_dated = options.contract("O:AAPL280121C00220000")
+puts "Far-dated contract: #{far_dated.ticker}, expires #{far_dated.expiration_date}"
 
 # Analyze recent trading activity
 trades = options.trades(contract, limit: 100)

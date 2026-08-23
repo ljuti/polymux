@@ -61,7 +61,7 @@ module Polymux
       # @option options [Integer] :limit Number of results per page (max: 1000)
       # @option options [String] :order Sort order: "asc" or "desc" (default: "asc")
       #
-      # @return [Array<Contract>] Array of contract objects matching the criteria
+      # @return [Array<Contract>] Array of contract objects matching the criteria (all pages of the chain are fetched)
       #
       # @example Get all AAPL contracts
       #   contracts = options.contracts("AAPL")
@@ -90,6 +90,33 @@ module Polymux
       # @see #contracts
       def for_ticker(underlying_ticker, options = {})
         contracts(underlying_ticker, options)
+      end
+
+      # Get a single options contract by its OCC ticker.
+      #
+      # Resolves one contract through the path form of the contracts endpoint
+      # (`GET /v3/reference/options/contracts/{options_ticker}`). Unlike
+      # #contracts, which lists a chain by underlying ticker, this returns the
+      # exact contract for the given OCC ticker — including far-dated
+      # expirations that never appear in the default paginated chain listing.
+      #
+      # @param ticker [String, Contract] OCC options ticker (e.g., "O:AAPL240315C00150000") or a Contract object
+      # @param options [Hash] Additional query parameters (currently unused)
+      #
+      # @return [Contract] The matching contract
+      # @raise [ArgumentError] if ticker is neither a String nor a Contract object
+      # @raise [Polymux::Api::Error] if the API request fails or the ticker is unknown
+      #
+      # @example Resolve a far-dated contract by OCC ticker
+      #   contract = options.contract("O:AEM280121C00220000")
+      #   puts "Strike: $#{contract.strike_price}, expires #{contract.expiration_date}"
+      def contract(ticker, options = {})
+        ticker = resolve_ticker(ticker)
+
+        url = "/v3/reference/options/contracts/#{ticker}"
+        fetch_single(url, options, "contract #{ticker}") do |response_body|
+          Contract.from_api(response_body.fetch("results"))
+        end
       end
 
       # Get current market snapshot for a specific options contract.
@@ -168,7 +195,7 @@ module Polymux
       # @option options [String] :timestamp Filter trades after this timestamp (nanos)
       # @option options [String] :"timestamp.gte" Trades on or after timestamp
       # @option options [String] :"timestamp.lte" Trades on or before timestamp
-      # @option options [Integer] :limit Number of results to return (max: 50,000)
+      # @option options [Integer] :limit Number of results per page (max: 50,000); remaining pages are fetched automatically
       # @option options [String] :order Sort order: "asc" or "desc" (default: "asc")
       #
       # @return [Array<Trade>] Array of trade execution records
@@ -205,7 +232,7 @@ module Polymux
       # @option options [String] :timestamp Filter quotes after this timestamp (nanos)
       # @option options [String] :"timestamp.gte" Quotes on or after timestamp
       # @option options [String] :"timestamp.lte" Quotes on or before timestamp
-      # @option options [Integer] :limit Number of results to return (max: 50,000)
+      # @option options [Integer] :limit Number of results per page (max: 50,000); remaining pages are fetched automatically
       # @option options [String] :order Sort order: "asc" or "desc" (default: "asc")
       #
       # @return [Array<Quote>] Array of bid/ask quote records
@@ -311,8 +338,16 @@ module Polymux
 
       private
 
+      # Maximum number of pages to follow via next_url before raising.
+      # Guards against malformed responses with never-terminating cursors.
+      MAX_PAGINATION_PAGES = 1000
+
       # Template method for fetching collections (arrays) of data.
       # Eliminates duplication in HTTP calls and error handling.
+      #
+      # Follows the `next_url` cursor in each page's response until the API
+      # returns no more pages, so callers receive complete result sets (e.g.
+      # full option chains) instead of only the first page.
       #
       # @param url [String] The API endpoint URL
       # @param params [Hash] Query parameters
@@ -322,19 +357,40 @@ module Polymux
       # @yield [item_json] Block to transform each item in the results array
       # @return [Array] Array of transformed objects
       def fetch_collection(url, params = {}, results_key = "results", error_context = nil, allow_404_graceful_degradation = false, &block)
-        response = _client.http.get(url, params)
+        items = []
+        pages = 0
+        current_url = url
+        current_params = params
 
-        # Treat 404 as "no results found" only for discovery/search endpoints
-        # Discovery endpoints should gracefully degrade rather than explode
-        if allow_404_graceful_degradation && response.status == 404
-          return []
+        loop do
+          response = _client.http.get(current_url, current_params)
+
+          # Treat 404 as "no results found" only for discovery/search endpoints
+          # Discovery endpoints should gracefully degrade rather than explode
+          if allow_404_graceful_degradation && pages.zero? && response.status == 404
+            return []
+          end
+
+          raise Polymux::Api::Error, build_error_message(error_context, current_url) unless response.success?
+
+          break unless response.body.instance_of?(Hash)
+
+          page_results = response.body.fetch(results_key, [])
+          items.concat(page_results) if page_results
+
+          next_url = response.body["next_url"]
+          break if next_url.nil? || next_url.empty?
+
+          pages += 1
+          if pages >= MAX_PAGINATION_PAGES
+            raise Polymux::Api::Error, "Pagination exceeded #{MAX_PAGINATION_PAGES} pages for #{current_url}; pass a larger :limit to reduce page count"
+          end
+
+          current_url = next_url
+          current_params = {}
         end
 
-        raise Polymux::Api::Error, build_error_message(error_context, url) unless response.success?
-
-        return [] unless response.body.instance_of?(Hash)
-
-        response.body.fetch(results_key, []).map(&block)
+        items.map(&block)
       end
 
       # Template method for fetching single objects.

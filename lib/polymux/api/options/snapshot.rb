@@ -50,9 +50,9 @@ module Polymux
         # @return [LastTrade, nil] Last trade price and size
         attribute? :last_trade, LastTrade.optional
 
-        # Number of outstanding contracts
-        # @return [Integer] Open interest (total contracts not yet closed)
-        attribute :open_interest, Types::Integer
+                # Number of outstanding contracts
+        # @return [Integer, nil] Open interest (total contracts not yet closed; nil when the API omits it)
+        attribute? :open_interest, Types::Integer | Types::Nil
 
         # Information about the underlying stock
         # @return [UnderlyingAsset] Current underlying asset data
